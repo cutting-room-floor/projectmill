@@ -37,6 +37,9 @@ function readdirr(dir, callback) {
             wait += files.length; // ...wait on it's files.
 
             files.forEach(function(f) {
+                // Skip dotfiles
+                if (f[0] == '.') return done();
+
                 f = path.join(basepath, f);
                 var filepath = path.join(d, f)
 
@@ -91,6 +94,60 @@ function filecopy(source, dest, callback) {
     newFile.once('open', function(fd){
         util.pump(oldFile, newFile, callback);
     });
+}
+
+// Helper: Process a file.
+function fileprocess(source, dest, processor, callback) {
+    fs.readFile(source, 'utf8', function(err, data){
+        data = processor(data);
+        fs.writeFile(dest, data, 'utf8', callback);
+    });
+}
+
+// Processor: MML
+function processMML(config) {
+
+    // add 'b' to 'a'
+    function assign(a, b, k) {
+        switch (typeof b[k]) {
+            case 'object':
+                iterObject(a[k], b[k]);
+                break;
+            case 'array':
+                iterArray(a[k], b[k]);
+                break;
+            case 'number':
+            case 'string':
+            case 'boolean':
+                a[k] = b[k];
+                break;
+        }
+    }
+
+    function iterObject(a, b) {
+        for (var k in b) {
+            assign(a, b, k);
+        }
+    }
+
+    function iterArray(a, b) {
+        b.forEach(function(v, i) {
+            assign(a, b, i);
+        });
+    }
+
+    return function(o) {
+        o = JSON.parse(o);
+        iterObject(o, config.mml);
+        return JSON.stringify(o, null, 2);
+    }
+}
+
+// Processor: MSS
+function processMSS(config) {
+    return function(o) {
+        return o;
+    }
 }
 
 var usage = 'Usage: ./index.js <command> [-c ...] [-p ...]';
@@ -224,11 +281,19 @@ actions.push(function(next, err) {
 
                     if (linkSource) {
                         console.log('Notice: creating symlink: ' + destfile + ' -> ' + linkSource);
-                        fs.symlink(linkSource, destfile, next);
+                        return fs.symlink(linkSource, destfile, next);
+                    }
+                    else if (config[i].mml && path.extname(filename) == '.mml') {
+                        console.log('Notice: processing mml file: ' + sourcefile +' to '+ destfile);
+                        return fileprocess(sourcefile, destfile, processMML(config[i]), next);
+                    }
+                    else if (config[i].cartoVars && path.extname(filename) == '.mss') {
+                        console.log('Notice: processing carto file: ' + sourcefile +' to '+ destfile);
+                        return fileprocess(sourcefile, destfile, processMSS(config[i]), next);
                     }
                     else {
                         console.log('Notice: coping file: ' + sourcefile +' to '+ destfile);
-                        filecopy(sourcefile, destfile, next)
+                        return filecopy(sourcefile, destfile, next)
                     }
                 });
             })
