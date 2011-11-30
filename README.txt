@@ -55,8 +55,8 @@ Additionally, the following options will be passed to TileMill's export commnd
 
 ## Options
 
--p      Path to the TileMill install
-
--d      Path to TileMill project folder. (Defaults: `~/Documents/Mapbox/project`)
+-t      Path to the TileMill install
 
 -c      specify a config file. (Defaults: `./config.json`)
+
+-p      Path to TileMill project folder. (Defaults: `~/Documents/Mapbox/project`)

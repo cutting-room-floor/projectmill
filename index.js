@@ -161,7 +161,7 @@ function processMSS(config) {
     }
 }
 
-var usage = 'Usage: ./index.js <command> [-c ./config.json] [-p /path/to/tilemill]';
+var usage = 'Usage: ./index.js <command> [-c ./config.json] [-t /path/to/tilemill]';
 
 // Closure vars
 var config = {},
@@ -178,7 +178,7 @@ if (command != 'mill' && command != 'render' && command != 'upload') {
 }
 
 // Try to locate TileMill
-var tilemillPath = argv.p || 'tilemill';
+var tilemillPath = argv.t || 'tilemill';
 try {
     var tilemill = require.resolve(tilemillPath);
 }
