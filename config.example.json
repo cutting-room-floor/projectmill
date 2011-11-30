@@ -1,0 +1,15 @@
+[
+    {
+        "source": "foo",
+        "destination": "bar",
+        "mml": {
+            "interactivity": false,
+            "Layer": [
+                {"id": "bar"}
+            ]
+        },
+        "cartoVars": {
+            "color": "#ccc"
+        }
+    }
+]

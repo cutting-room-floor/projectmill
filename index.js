@@ -161,7 +161,7 @@ function processMSS(config) {
     }
 }
 
-var usage = 'Usage: ./index.js <command> [-c ...] [-p ...]';
+var usage = 'Usage: ./index.js <command> [-c ./config.json] [-p /path/to/tilemill]';
 
 // Closure vars
 var config = {},
@@ -196,7 +196,7 @@ actions.push(function(next, err) {
     if (err) return next(err);
 
     var configFile = argv.c || 'config.json';
-    fs.readFile(path.join(process.cwd(), 'config.json'), 'utf8', next);
+    fs.readFile(path.join(process.cwd(), configFile), 'utf8', next);
 });
 actions.push(function(next, err, data) {
     if (err) return next(err);
@@ -257,6 +257,8 @@ actions.push(function(next, err, files) {
 
 // Regardless of the command 'mill' needs to run.
 actions.push(function(next, err) {
+    if (err) return next(err);
+
     var mill = [];
     for (var i in config) {
         mill.push(function(cb, exists) {

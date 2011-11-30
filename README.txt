@@ -46,7 +46,7 @@ Additionally, the following options will be passed to TileMill's export commnd
 
 ## Commands
 
-`mill`      NOT IMPLEMENTED Generate new tilemill projects based on the configuration.
+`mill`      Generate new tilemill projects based on the configuration.
 
 `render`    NOT IMPLEMENTED Render projects (and mill them first if required).
 
