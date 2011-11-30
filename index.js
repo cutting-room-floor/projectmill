@@ -35,7 +35,7 @@ function readdirr(dir, callback) {
 
             files.forEach(function(f) {
                 f = path.join(d, f)
-                fs.stat(f, function(err, stats) {
+                fs.lstat(f, function(err, stats) {
                     if (err) {
                         console.warn(err.message);
                         return done();
@@ -43,6 +43,17 @@ function readdirr(dir, callback) {
                     if (stats.isFile()) {
                         filelist.push(f);
                         return done();
+                    }
+                    if (stats.isSymbolicLink()) {
+                        fs.readlink(f, function(err, src) {
+                            if (err) {
+                                console.warn(err.message);
+                            }
+                            else {
+                                filelist.push({source: src, target: f});
+                            }
+                            done();
+                        });
                     }
                     if (stats.isDirectory()) {
                         return read(f);
