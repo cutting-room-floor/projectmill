@@ -145,8 +145,19 @@ function processMML(config) {
 
 // Processor: MSS
 function processMSS(config) {
+    var varMatch = /^@([\w-]+):[\W]?([^;]+);$/;
+
     return function(o) {
-        return o;
+        var lines = o.split("\n");
+        for (var i = 0; i < lines.length; i++) {
+            lines[i] = lines[i].replace(varMatch, function(m, n, v, o, s) {
+                if (config.cartoVars[n] != undefined) {
+                    return '@' + n +': '+ config.cartoVars[n] +';';
+                }
+                return s;
+            });
+        }
+        return lines.join("\n");
     }
 }
 
