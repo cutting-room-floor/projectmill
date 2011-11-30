@@ -167,7 +167,7 @@ var usage = 'Usage: ./index.js <command> [-c ./config.json] [-t /path/to/tilemil
 var config = {},
     tilemill = '',
     argv = require('optimist').usage(usage).argv,
-    fileDir = argv.d || path.join(process.env.HOME, 'Documents', 'MapBox'),
+    fileDir = argv.p || path.join(process.env.HOME, 'Documents', 'MapBox'),
     command = argv._.pop();
 
 // If no command was issued bail. Perhaps we should have a default?
