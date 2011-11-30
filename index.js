@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 var fs = require('fs'),
-    path = require('path');
+    path = require('path'),
+    util = require('util');
 
 // Helper: Run an array of functions in serial
 function serial(steps, done) {
@@ -21,47 +22,75 @@ function readdirr(dir, callback) {
     var filelist = [],
         wait = 1;
 
-    var done = function() {
+    var done = function(err) {
+        if (err) console.warn(err.message);
+
         wait--;
         if (wait === 0) callback(null, filelist);
     };
 
-    (function read(d) {
-        fs.readdir(d, function(err, files) {
+    (function read(d, basepath) {
+        fs.readdir(path.join(d, basepath), function(err, files) {
             if (err) return callback(err);
 
             wait--; // Don't wait on the directory...
             wait += files.length; // ...wait on it's files.
 
             files.forEach(function(f) {
-                f = path.join(d, f)
-                fs.lstat(f, function(err, stats) {
-                    if (err) {
-                        console.warn(err.message);
-                        return done();
+                f = path.join(basepath, f);
+                var filepath = path.join(d, f)
+
+                fs.lstat(filepath, function(err, stats) {
+                    if (err) return done(err);
+
+                    if (stats.isDirectory()) {
+                        return read(dir, f);
                     }
-                    if (stats.isFile()) {
+                    else if (stats.isFile()) {
                         filelist.push(f);
                         return done();
                     }
-                    if (stats.isSymbolicLink()) {
-                        fs.readlink(f, function(err, src) {
-                            if (err) {
-                                console.warn(err.message);
-                            }
-                            else {
-                                filelist.push({source: src, target: f});
-                            }
-                            done();
+                    else if (stats.isSymbolicLink()) {
+                        fs.readlink(filepath, function(err, src) {
+                            if (err) return done(err);
+
+                            filelist.push({source: src, target: f});
+                            return done();
                         });
-                    }
-                    if (stats.isDirectory()) {
-                        return read(f);
                     }
                 });  
             });
         });
     })(dir);
+}
+
+// Helper: Recursive version or fs.mkdir
+// https://gist.github.com/707661
+function mkdirp(p, mode, f) {
+    var cb = f || function() {};
+    if (p.charAt(0) != '/') {
+        cb(new Error('Relative path: ' + p));
+        return;
+    }
+
+    var ps = path.normalize(p).split('/');
+    path.exists(p, function(exists) {
+        if (exists) return cb(null);
+        mkdirp(ps.slice(0, -1).join('/'), mode, function(err) {
+            if (err && err.errno != constants.EEXIST) return cb(err);
+            fs.mkdir(p, mode, cb);
+        });
+    });
+};
+
+// Helper: Copy a file
+function filecopy(source, dest, callback) {
+    newFile = fs.createWriteStream(dest);
+    oldFile = fs.createReadStream(source);
+
+    newFile.once('open', function(fd){
+        util.pump(oldFile, newFile, callback);
+    });
 }
 
 var usage = 'Usage: ./index.js <command> [-c ...] [-p ...]';
@@ -117,7 +146,7 @@ actions.push(function(next, err, data) {
             config[v.destination] = v;
         }
         else {
-            console.warn("Error: skipping project definition >> " + JSON.stringify(v));
+            console.warn("Error: project missing required elements >> " + JSON.stringify(v));
         }
     });
     next();
@@ -141,7 +170,7 @@ actions.push(function(next, err, files) {
 
     for (var i in config) {
         if (paths[config[i].source] == undefined) {
-            console.warn("Error: skipping project definition >> " + JSON.stringify(config[i]));
+            console.warn("Error: source project doesn't exist >> " + JSON.stringify(config[i]));
             delete config[i];
         }
         else {
@@ -158,17 +187,55 @@ actions.push(function(next, err, files) {
     next();
 });
 
+// Regardless of the command 'mill' needs to run.
 actions.push(function(next, err) {
-    // Regardless of the command 'mill' needs to run.
     var mill = [];
     for (var i in config) {
-        mill.push(function(cb) {
+        mill.push(function(cb, exists) {
             readdirr(config[i].source, cb);
         });
         mill.push(function(cb, err, files) {
             if (err) return cb(err);
-            console.log(files);
-            cb();
+
+            var setup = [];
+            files.forEach(function(filename) {
+                // Handle symlinks which come in as an object.
+                var linkSource = '';
+                if (typeof filename != 'string') {
+                     linkSource = filename.source;
+                     filename = filename.target
+                }
+
+                var destfile = path.join(config[i].destination, filename),
+                    destdir = path.dirname(destfile),
+                    sourcefile = path.join(config[i].source, filename);
+
+                setup.push(function(next) {
+                    path.exists(destdir, next);
+                });
+                setup.push(function(next, err, exists) {
+                    if (exists) next();
+
+                    console.log('Notice: creating directory: ' + destdir);
+                    mkdirp(destdir, '0777', next);
+                });
+                setup.push(function(next, err) {
+                    if (err) next(err);
+
+                    if (linkSource) {
+                        console.log('Notice: creating symlink: ' + destfile + ' -> ' + linkSource);
+                        fs.symlink(linkSource, destfile, next);
+                    }
+                    else {
+                        console.log('Notice: coping file: ' + sourcefile +' to '+ destfile);
+                        filecopy(sourcefile, destfile, next)
+                    }
+                });
+            })
+            serial(setup, function(err) {
+                if (err) console.warn(err.message);
+                cb();
+            });
         });
     }
     serial(mill, next);
