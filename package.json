@@ -11,7 +11,8 @@
     "node": "~0.4.12"
   },
   "dependencies": {
-    "optimist": "0.1.x"
+    "optimist": "0.1.x",
+    "sqlite3": "~2.0.16"
   },
   "devDependencies": {}
 }

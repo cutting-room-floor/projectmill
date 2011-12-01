@@ -320,15 +320,15 @@ actions.push(function(next, err) {
 });
 
 if (command == "render" || command == "upload") {
-    var spawn = require('child_process').spawn;
+    var spawn = require('child_process').spawn,
+        sqlite3 = require('sqlite3');
 
     actions.push(function(next, err) {
         var render = [];
         for (var i in config) {
+            var data = config[i];
             render.push(function(cb, err) {
                 if (err) return cb(err);
-
-                var data = config[i];
 
                 if (data.format == undefined) {
                     var err = new Error('export format not specified for `'+i+'`');
@@ -360,9 +360,55 @@ if (command == "render" || command == "upload") {
                 console.log('Notice: '+ args.join(' '));
 
                 // todo get more output from the child process.
+                // todo get the actual name of the database written to.
                 spawn('nice', args).on('exit', function(code, signal) {
                     var err = code ? new Error('Render failed: '+ i) : null;
                     cb(err);
+                });
+            });
+
+            // If this isn't mbtile, or we don't have meta data to add to it
+            // skip the remainder of the render steps.
+            if (data.format != 'mbtiles' || data.MBmeta == undefined) continue;
+
+            render.push(function(cb, err) {
+                if (err) return cb(err);
+
+                var dbpath = (path.join(fileDir, 'export', i + '.' + data.format));
+                var db = new sqlite3.Database(dbpath, sqlite3.OPEN_READWRITE, function(err) {
+                    cb(err, db);
+                });
+            });
+            render.push(function(cb, err, db) {
+                if (err) return cb(err);
+
+                var sql = 'REPLACE INTO metadata (name, value) VALUES (?, ?)';
+                var stmt = db.prepare(sql, function(err) {
+                    cb(err, db, stmt);
+                });
+            });
+            render.push(function(cb, err, db, stmt) {
+                if (err) console.warn(err);
+
+                var rows = [];
+                for (var k in data.MBmeta) {
+                    if (typeof data.MBmeta[k] == 'string') {
+                        rows.push(function(nextRow, err) {
+                            if (err) console.warn(err);
+
+                            console.log('Notice: writing custom metadata: '+ k +' -> '+ data.MBmeta[k]);
+                            stmt.run(k, data.MBmeta[k], function(err){
+                                if (err) console.warn(err);
+                                stmt.finalize(nextRow);
+                            })
+                        });
+                    }
+                }
+                serial(rows, function(err) {
+                    if (err) console.warn(err);
+
+                    delete db;
+                    cb(null, db);
                 });
             });
         }

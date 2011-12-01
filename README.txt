@@ -24,7 +24,7 @@ following keys:
 `cartoVars`     A json object containing key value pairs which can be use to
                 override variables in in carto stylesheets.
 
-`MBmeta`        NOT IMPLEMENTED MBTiles: A json object containing key value pairs which will be added to
+`MBmeta`        MBTiles: A json object containing key value pairs which will be added to
                 a rendered MBtiles export.
 
 Additionally, the following options will be passed to TileMill's export commnd

@@ -13,6 +13,9 @@
         },
         "cartoVars": {
             "color": "#ccc"
+        },
+        "MBmeta": {
+            "custom_tags": "Lorem, Ipsum"
         }
     }
 ]
