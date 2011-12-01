@@ -17,6 +17,15 @@ function serial(steps, done) {
     (steps.reduceRight(wrap, done))();
 }
 
+// Helper: Determine if an error should just be logged.
+function triageError(err) {
+    if (err && err.name == 'ProjectMill') {
+        console.warn(err.toString());
+        err = null;
+    }
+    return err;
+}
+
 // Helper: Recursive version or fs.readdir
 function readdirr(dir, callback) {
     var filelist = [],
@@ -189,7 +198,8 @@ catch(err) {
 }
 
 // Assemble the main actions.
-var actions = [];
+var actions = [],
+    cli = require('readline').createInterface(process.stdin, process.stdout);
 
 // Get our configuration
 actions.push(function(next, err) {
@@ -243,13 +253,7 @@ actions.push(function(next, err, files) {
         }
         else {
             config[i].source = paths[config[i].source];
-            if (paths[config[i].destination]) {
-                console.warn('Error: destination map '+ config[i].destination +' already exists');
-                delete config[i];
-            }
-            else {
-                config[i].destination = path.join(fileDir, 'project', config[i].destination);
-            }
+            config[i].destination = path.join(fileDir, 'project', config[i].destination);
         }
     }
     next();
@@ -261,7 +265,30 @@ actions.push(function(next, err) {
 
     var mill = [];
     for (var i in config) {
+
+        mill.push(function(cb, err) {
+            err = triageError(err);
+            if (err) return cb(err);
+
+            path.exists(config[i].destination, cb);
+        });
         mill.push(function(cb, exists) {
+            if (!exists) return cb();
+
+            cli.question('Project '+ i +' already exists. Re-mill? (y/N): ', function(r){
+                if (r.toLowerCase() === "y") {
+                    console.warn('Sorry, I cannot do that yet.');
+                    // todo, deletion.
+                    //return cb();
+                }
+                var e = new Error('Skipping project '+ i);
+                e.name = "ProjectMill";
+                cb(e);
+            });
+        });
+        mill.push(function(cb, err) {
+            if (err) return cb(err);
+
             readdirr(config[i].source, cb);
         });
         mill.push(function(cb, err, files) {
@@ -311,12 +338,14 @@ actions.push(function(next, err) {
                 });
             })
             serial(setup, function(err) {
-                if (err) console.warn(err.message);
+                if (err) console.warn(err);
                 cb();
             });
         });
     }
-    serial(mill, next);
+    serial(mill, function(err) {
+        next(triageError(err));
+    });
 });
 
 // If trying to render, or upload, do it now!
@@ -325,9 +354,32 @@ if (command == "render" || command == "upload") {
         sqlite3 = require('sqlite3');
 
     actions.push(function(next, err) {
+        if (err) return next(err);
+
         var render = [];
         for (var i in config) {
-            var data = config[i];
+            var data = config[i],
+                destfile = path.join(fileDir, 'export', i + '.' + data.format);
+
+            render.push(function(cb, err) {
+                err = triageError(err);
+                if (err) return cb(err);
+
+                path.exists(destfile, cb);
+            });
+            render.push(function(cb, err) {
+                cli.question('Overwrite '+ destfile +'? (y/N): ', function(r) {
+                    if (r.toLowerCase() === "y") {
+                        console.log("Notice: deleting " + destfile);
+                        fs.unlink(destfile, cb);
+                    }
+                    else {
+                        var e = new Error('Skipping export');
+                        e.name = "ProjectMill";
+                        cb(e);
+                    }
+                });
+            });
             render.push(function(cb, err) {
                 if (err) return cb(err);
 
@@ -348,7 +400,7 @@ if (command == "render" || command == "upload") {
                 // datasource
                 args.push(i);
                 // filepath
-                args.push(path.join(fileDir, 'export', i + '.' + data.format));
+                args.push(destfile);
                 // format, don't try to guess extension based on filepath
                 args.push('--format=' + data.format);
 
@@ -375,8 +427,7 @@ if (command == "render" || command == "upload") {
             render.push(function(cb, err) {
                 if (err) return cb(err);
 
-                var dbpath = (path.join(fileDir, 'export', i + '.' + data.format));
-                var db = new sqlite3.Database(dbpath, sqlite3.OPEN_READWRITE, function(err) {
+                var db = new sqlite3.Database(destfile, sqlite3.OPEN_READWRITE, function(err) {
                     cb(err, db);
                 });
             });
@@ -389,7 +440,7 @@ if (command == "render" || command == "upload") {
                 });
             });
             render.push(function(cb, err, db, stmt) {
-                if (err) console.warn(err);
+                if (err) return cb(err);
 
                 var rows = [];
                 for (var k in data.MBmeta) {
@@ -413,16 +464,28 @@ if (command == "render" || command == "upload") {
                 });
             });
         }
-        serial(render, next)
+        serial(render, function(err) {
+            next(triageError(err));
+        });
     });
 }
 
+// Uploading... yea...
 if (command == "upload") {
-    console.warn('Sorry, I cannot upload yet. I will `mill` and `render` for you.')
+    actions.push(function(next, err) {
+        if (err) return next(err);
+
+        console.warn('Sorry, I cannot upload yet.')
+        next();
+    });
 }
 
 // Run the main actions.
 serial(actions, function(err) {
-    if (err) console.warn(err.message);
-    console.log('done.');
+    if (err) console.warn(err.toString());
+    console.log('Done.');
+
+    // Interface cleanup
+    cli.close();
+    process.stdin.destroy();
 });
