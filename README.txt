@@ -24,14 +24,14 @@ following keys:
 `cartoVars`     A json object containing key value pairs which can be use to
                 override variables in in carto stylesheets.
 
-`MBmeta`        MBTiles: A json object containing key value pairs which will be added to
+`MBmeta`        NOT IMPLEMENTED MBTiles: A json object containing key value pairs which will be added to
                 a rendered MBtiles export.
 
 Additionally, the following options will be passed to TileMill's export commnd
 
 `format`        Export format (png|pdf|svg|mbtiles). (Default: undefined)
 
-`bbox`          Comma separated coordinates of bounding box to export. (Default: undefined)
+`bbox`          Array containing coordinates of bounding box to export. (Default: undefined)
 
 `minzoom`       MBTiles: minimum zoom level to export. (Default: undefined)
 
@@ -48,7 +48,7 @@ Additionally, the following options will be passed to TileMill's export commnd
 
 `mill`      Generate new tilemill projects based on the configuration.
 
-`render`    NOT IMPLEMENTED Render projects (and mill them first if required).
+`render`    Render projects (and mill them first if required).
 
 `upload`    NOT IMPLEMENTED Uploads projects to MapBox hosting (Mill and render first if required);
 
@@ -59,4 +59,4 @@ Additionally, the following options will be passed to TileMill's export commnd
 
 -c      specify a config file. (Defaults: `./config.json`)
 
--p      Path to TileMill project folder. (Defaults: `~/Documents/Mapbox/project`)
+-p      Path to TileMill project folder. (Defaults: `~/Documents/Mapbox`)

@@ -2,6 +2,9 @@
     {
         "source": "foo",
         "destination": "bar",
+        "format": "mbtiles",
+        "minzoom": 1,
+        "maxzoom": 4,
         "mml": {
             "interactivity": false,
             "Layer": [

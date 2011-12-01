@@ -319,6 +319,57 @@ actions.push(function(next, err) {
     serial(mill, next);
 });
 
+if (command == "render" || command == "upload") {
+    var spawn = require('child_process').spawn;
+
+    actions.push(function(next, err) {
+        var render = [];
+        for (var i in config) {
+            render.push(function(cb, err) {
+                if (err) return cb(err);
+
+                var data = config[i];
+
+                if (data.format == undefined) {
+                    var err = new Error('export format not specified for `'+i+'`');
+                    return cb(err);
+                }
+
+                var args = [];
+                // nice the export process.
+                args.push('-n19');
+                // node command
+                args.push(process.execPath);
+                // tilemill index.js
+                args.push(path.join(tilemill));
+                // export command
+                args.push('export');
+                // datasource
+                args.push(i);
+                // filepath
+                args.push(path.join(fileDir, 'export', i + '.' + data.format));
+                // format, don't try to guess extension based on filepath
+                args.push('--format=' + data.format);
+
+                if (data.bbox) args.push('--bbox=' + data.bbox.join(','));
+                if (data.width) args.push('--width=' + data.width);
+                if (data.height) args.push('--height=' + data.height);
+                if (data.minzoom) args.push('--minzoom=' + data.minzoom);
+                if (data.maxzoom) args.push('--maxzoom=' + data.maxzoom);
+
+                console.log('Notice: '+ args.join(' '));
+
+                // todo get more output from the child process.
+                spawn('nice', args).on('exit', function(code, signal) {
+                    var err = code ? new Error('Render failed: '+ i) : null;
+                    cb(err);
+                });
+            });
+        }
+        serial(render, next)
+    });
+}
+
 // Run the main actions.
 serial(actions, function(err) {
     if (err) console.warn(err.message);
