@@ -319,6 +319,7 @@ actions.push(function(next, err) {
     serial(mill, next);
 });
 
+// If trying to render, or upload, do it now!
 if (command == "render" || command == "upload") {
     var spawn = require('child_process').spawn,
         sqlite3 = require('sqlite3');
@@ -414,6 +415,10 @@ if (command == "render" || command == "upload") {
         }
         serial(render, next)
     });
+}
+
+if (command == "upload") {
+    console.warn('Sorry, I cannot upload yet. I will `mill` and `render` for you.')
 }
 
 // Run the main actions.
