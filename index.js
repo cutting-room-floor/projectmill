@@ -299,7 +299,7 @@ actions.push(function(next, err) {
     if (err) return next(err);
 
     var mill = [];
-    for (var i in config) {
+    Object.keys(config).forEach(function(i) {
 
         mill.push(function(cb, err) {
             err = triageError(err);
@@ -378,7 +378,7 @@ actions.push(function(next, err) {
                 cb();
             });
         });
-    }
+    });
     serial(mill, function(err) {
         next(triageError(err));
     });
@@ -393,7 +393,7 @@ if (command == "render" || command == "upload") {
         if (err) return next(err);
 
         var render = [];
-        for (var i in config) {
+        Object.keys(config).forEach(function(i) {
             var data = config[i],
                 destfile = path.join(fileDir, 'export', i + '.' + data.format);
 
@@ -403,7 +403,9 @@ if (command == "render" || command == "upload") {
 
                 path.exists(destfile, cb);
             });
-            render.push(function(cb, err) {
+            render.push(function(cb, exists) {
+                if (!exists) return cb();
+
                 cli.question('Overwrite '+ destfile +'? (y/N): ', function(r) {
                     if (r.toLowerCase() === "y") {
                         console.log("Notice: deleting " + destfile);
@@ -458,7 +460,7 @@ if (command == "render" || command == "upload") {
 
             // If this isn't mbtile, or we don't have meta data to add to it
             // skip the remainder of the render steps.
-            if (data.format != 'mbtiles' || data.MBmeta == undefined) continue;
+            if (data.format != 'mbtiles' || data.MBmeta == undefined) return;
 
             render.push(function(cb, err) {
                 if (err) return cb(err);
@@ -479,7 +481,7 @@ if (command == "render" || command == "upload") {
                 if (err) return cb(err);
 
                 var rows = [];
-                for (var k in data.MBmeta) {
+                Object.keys(data.MBmeta).forEach(function(k) {
                     if (typeof data.MBmeta[k] == 'string') {
                         rows.push(function(nextRow, err) {
                             if (err) console.warn(err);
@@ -491,7 +493,7 @@ if (command == "render" || command == "upload") {
                             })
                         });
                     }
-                }
+                });
                 serial(rows, function(err) {
                     if (err) console.warn(err);
 
@@ -499,7 +501,7 @@ if (command == "render" || command == "upload") {
                     cb(null, db);
                 });
             });
-        }
+        });
         serial(render, function(err) {
             next(triageError(err));
         });
