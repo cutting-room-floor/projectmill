@@ -343,6 +343,14 @@ actions.push(function(next, err) {
                     destdir = path.dirname(destfile),
                     sourcefile = path.join(config[i].source, filename);
 
+                // In the future the 'mml' file will always be called
+                // 'project.mml', but currently this isn't the case.
+                // TODO delete this when https://github.com/mapbox/tilemill/pull/970
+                //      is merged.
+                if (path.extname(filename) == '.mml' && filename != 'project.mml') {
+                    destfile = path.join(config[i].destination, i +'.mml');
+                }
+
                 setup.push(function(next) {
                     path.exists(destdir, next);
                 });
