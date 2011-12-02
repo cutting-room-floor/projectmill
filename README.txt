@@ -6,12 +6,17 @@ then render them all out? What to script that? We gotcha covered.
 
 Usage: ./index.js <command> [options]
 
+## Installation
+
+ProjectMill is a node.js script. It expects to be run with node 0.4.x, just
+like TileMill. ProjectMill has two dependencies that can be installed with npm,
+by running `npm install`.
 
 ## Configuration
 
 Configuration is expected as an json file which contains an array as the root
-object. Each element in the array should be an object which can have the
-following keys:
+object. See `config.example.json` for an example. Each element in the array
+should be an object which can have the following keys:
 
 `source`        REQUIRED The source project, generally the name of folder it
                 lives in.
