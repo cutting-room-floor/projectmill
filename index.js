@@ -472,33 +472,31 @@ if (command == "render" || command == "upload") {
             render.push(function(cb, err, db) {
                 if (err) return cb(err);
 
-                var sql = 'REPLACE INTO metadata (name, value) VALUES (?, ?)';
-                var stmt = db.prepare(sql, function(err) {
-                    cb(err, db, stmt);
-                });
-            });
-            render.push(function(cb, err, db, stmt) {
-                if (err) return cb(err);
-
                 var rows = [];
                 Object.keys(data.MBmeta).forEach(function(k) {
-                    if (typeof data.MBmeta[k] == 'string') {
-                        rows.push(function(nextRow, err) {
-                            if (err) console.warn(err);
+                    if (typeof data.MBmeta[k] != 'string') return;
 
-                            console.log('Notice: writing custom metadata: '+ k +' -> '+ data.MBmeta[k]);
-                            stmt.run(k, data.MBmeta[k], function(err){
-                                if (err) console.warn(err);
-                                stmt.finalize(nextRow);
-                            })
+                    rows.push(function(nextRow, err) {
+                        if (err) return console.warn(err.toString());
+
+                        var sql = 'REPLACE INTO metadata (name, value) VALUES (?, ?)';
+                        var stmt = db.prepare(sql, function(err) {
+                            nextRow(err, stmt);
                         });
-                    }
+                    });
+                    rows.push(function(nextRow, err, stmt) {
+                        if (err) return nextRow(err);
+
+                        console.log('Notice: writing custom metadata: '+ k +' -> '+ data.MBmeta[k]);
+                        stmt.run(k, data.MBmeta[k], function(err){
+                            if (err) console.warn(err);
+                            stmt.finalize(nextRow);
+                        })
+                    });
                 });
                 serial(rows, function(err) {
-                    if (err) console.warn(err);
-
                     delete db;
-                    cb(null, db);
+                    cb(err, db);
                 });
             });
         });
