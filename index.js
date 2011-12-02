@@ -27,7 +27,7 @@ function triageError(err) {
 }
 
 // Helper: Recursive version or fs.readdir
-function readdirr(dir, callback) {
+function readdirr(dir, callback, dotfiles) {
     var filelist = [],
         wait = 1;
 
@@ -47,7 +47,7 @@ function readdirr(dir, callback) {
 
             files.forEach(function(f) {
                 // Skip dotfiles
-                if (f[0] == '.') return done();
+                if (f[0] == '.' && !dotfiles) return done();
 
                 f = path.join(basepath, f);
                 var filepath = path.join(d, f)
@@ -74,6 +74,41 @@ function readdirr(dir, callback) {
             });
         });
     })(dir);
+}
+
+// Helper: Recursive file deletion
+function recursiveDelete(delPath, callback) {
+    readdirr(delPath, function(err, files) {
+        var tree = [],
+            dirs = {};
+
+        files.forEach(function(f) {
+            f = (typeof f == 'object' ? f.target : f);
+            f = path.join(delPath, f);
+            if (dirs[path.dirname(f)] == undefined) {
+                dirs[path.dirname(f)] = f;
+                tree.push(path.dirname(f));
+            }
+            tree.push(f);
+        });
+
+        var steps = [];
+        tree.reverse().forEach(function(p) {
+            if (dirs[p] == undefined) {
+                steps.push(function(next, err) {
+                    if (err) return next(err);
+                    fs.unlink(p, next);
+                });
+            }
+            else {
+                steps.push(function(next, err) {
+                    if (err) return next(err);
+                    fs.rmdir(p, next);
+                });
+            }
+        });
+        serial(steps, callback);
+    }, true);
 }
 
 // Helper: Recursive version or fs.mkdir
@@ -277,13 +312,14 @@ actions.push(function(next, err) {
 
             cli.question('Project '+ i +' already exists. Re-mill? (y/N): ', function(r){
                 if (r.toLowerCase() === "y") {
-                    console.warn('Sorry, I cannot do that yet.');
-                    // todo, deletion.
-                    //return cb();
+                    console.warn('Notice: removing project '+ config[i].destination);
+                    recursiveDelete(config[i].destination, cb);
                 }
-                var e = new Error('Skipping project '+ i);
-                e.name = "ProjectMill";
-                cb(e);
+                else {
+                    var e = new Error('Skipping project '+ i);
+                    e.name = "ProjectMill";
+                    cb(e);
+                }
             });
         });
         mill.push(function(cb, err) {
