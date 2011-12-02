@@ -4,7 +4,7 @@
         "destination": "bar",
         "format": "mbtiles",
         "minzoom": 1,
-        "maxzoom": 4,
+        "maxzoom": 2,
         "mml": {
             "interactivity": false,
             "Layer": [
@@ -15,7 +15,27 @@
             "color": "#ccc"
         },
         "MBmeta": {
-            "custom_tags": "Lorem, Ipsum"
+            "custom_tags": "Alpha, Beta",
+            "custom_text": "Lorem ipsum..."
+        }
+    },
+    {
+        "source": "foo",
+        "destination": "baz",
+        "format": "mbtiles",
+        "minzoom": 2,
+        "maxzoom": 3,
+        "mml": {
+            "interactivity": false,
+            "Layer": [
+                {"id": "baz"}
+            ]
+        },
+        "cartoVars": {
+            "color": "#eee"
+        },
+        "MBmeta": {
+            "custom_tags": "One, Two"
         }
     }
 ]
