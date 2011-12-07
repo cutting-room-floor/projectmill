@@ -21,7 +21,7 @@ should be an object which can have the following keys:
 `source`        REQUIRED The source project, generally the name of folder it
                 lives in.
 
-`destintion`    REQUIRED The destination project name.
+`destination`   REQUIRED The destination project name.
 
 `mml`           A json snippet which will be merged on top of the project's mml
                 file. To clear out an option set it to 'null'
