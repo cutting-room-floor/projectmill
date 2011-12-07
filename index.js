@@ -456,7 +456,7 @@ if (command == "render" || command == "upload") {
                 if (data.minzoom) args.push('--minzoom=' + data.minzoom);
                 if (data.maxzoom) args.push('--maxzoom=' + data.maxzoom);
 
-                console.log('Notice: '+ args.join(' '));
+                console.log('Notice: nice ' + args.join(' '));
 
                 // todo get more output from the child process.
                 // todo get the actual name of the database written to.
