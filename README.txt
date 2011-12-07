@@ -14,14 +14,14 @@ by running `npm install`.
 
 ## Configuration
 
-Configuration is expected as an json file which contains an array as the root
+Configuration is expected as a json file which contains an array as the root
 object. See `config.example.json` for an example. Each element in the array
 should be an object which can have the following keys:
 
 `source`        REQUIRED The source project, generally the name of folder it
                 lives in.
 
-`destintion`    REQUIRED The destintion project name.
+`destintion`    REQUIRED The destination project name.
 
 `mml`           A json snippet which will be merged on top of the project's mml
                 file. To clear out an option set it to 'null'
