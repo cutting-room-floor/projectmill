@@ -418,7 +418,7 @@ if (command == "render" || command == "upload") {
                     fs.unlink(destfile, cb);
                 }
                 else {
-                    var e = new Error('Skipping export');
+                    var e = new Error('Skipping export ' + i);
                     e.name = "ProjectMill";
                     cb(e);
                 }
