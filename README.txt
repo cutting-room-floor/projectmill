@@ -66,4 +66,4 @@ Additionally, the following options will be passed to TileMill's export commnd
 
 -p      Path to TileMill project folder. (Defaults: `~/Documents/Mapbox`)
 
--x      Replace existing
+-x      Replace existing projects (together with `mill`) or existing projects and exports (together with `render`).
