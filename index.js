@@ -212,6 +212,7 @@ var config = {},
     tilemill = '',
     argv = require('optimist').usage(usage).argv,
     fileDir = argv.p || path.join(process.env.HOME, 'Documents', 'MapBox'),
+    replaceExisting = argv.x || false,
     command = argv._.pop();
 
 // If no command was issued bail. Perhaps we should have a default?
@@ -310,17 +311,15 @@ actions.push(function(next, err) {
         mill.push(function(cb, exists) {
             if (!exists) return cb();
 
-            cli.question('Project '+ i +' already exists. Re-mill? (y/N): ', function(r){
-                if (r.toLowerCase() === "y") {
-                    console.warn('Notice: removing project '+ config[i].destination);
-                    recursiveDelete(config[i].destination, cb);
-                }
-                else {
-                    var e = new Error('Skipping project '+ i);
-                    e.name = "ProjectMill";
-                    cb(e);
-                }
-            });
+            if (replaceExisting) {
+                console.warn('Notice: removing project '+ config[i].destination);
+                recursiveDelete(config[i].destination, cb);
+            }
+            else {
+                var e = new Error('Skipping project '+ i);
+                e.name = "ProjectMill";
+                cb(e);
+            }
         });
         mill.push(function(cb, err) {
             if (err) return cb(err);
@@ -414,17 +413,15 @@ if (command == "render" || command == "upload") {
             render.push(function(cb, exists) {
                 if (!exists) return cb();
 
-                cli.question('Overwrite '+ destfile +'? (y/N): ', function(r) {
-                    if (r.toLowerCase() === "y") {
-                        console.log("Notice: deleting " + destfile);
-                        fs.unlink(destfile, cb);
-                    }
-                    else {
-                        var e = new Error('Skipping export');
-                        e.name = "ProjectMill";
-                        cb(e);
-                    }
-                });
+                if (replaceExisting) {
+                    console.log("Notice: deleting " + destfile);
+                    fs.unlink(destfile, cb);
+                }
+                else {
+                    var e = new Error('Skipping export');
+                    e.name = "ProjectMill";
+                    cb(e);
+                }
             });
             render.push(function(cb, err) {
                 if (err) return cb(err);

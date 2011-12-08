@@ -65,3 +65,5 @@ Additionally, the following options will be passed to TileMill's export commnd
 -c      specify a config file. (Defaults: `./config.json`)
 
 -p      Path to TileMill project folder. (Defaults: `~/Documents/Mapbox`)
+
+-x      Replace existing
