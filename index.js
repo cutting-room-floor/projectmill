@@ -212,7 +212,7 @@ var config = {},
     tilemill = '',
     argv = require('optimist').usage(usage).argv,
     fileDir = argv.p || path.join(process.env.HOME, 'Documents', 'MapBox'),
-    replaceExisting = argv.x || false,
+    replaceExisting = argv.f || false,
     command = argv._.pop();
 
 // If no command was issued bail. Perhaps we should have a default?
