@@ -452,6 +452,7 @@ if (command == "render" || command == "upload") {
                 if (data.height) args.push('--height=' + data.height);
                 if (data.minzoom) args.push('--minzoom=' + data.minzoom);
                 if (data.maxzoom) args.push('--maxzoom=' + data.maxzoom);
+                if (data.maxzoom) args.push('--files=' + fileDir);
 
                 console.log('Notice: nice ' + args.join(' '));
 
