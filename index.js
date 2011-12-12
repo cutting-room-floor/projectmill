@@ -349,7 +349,7 @@ actions.push(function(next, err) {
                     path.exists(destdir, next);
                 });
                 setup.push(function(next, err, exists) {
-                    if (exists) next();
+                    if (exists) return next();
 
                     console.log('Notice: creating directory: ' + destdir);
                     mkdirp(destdir, '0777', next);
