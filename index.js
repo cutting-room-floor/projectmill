@@ -127,11 +127,15 @@ function mkdirp(p, mode, f) {
 
 // Helper: Copy a file
 function filecopy(source, dest, callback) {
-    newFile = fs.createWriteStream(dest);
-    oldFile = fs.createReadStream(source);
-
-    newFile.once('open', function(fd){
-        util.pump(oldFile, newFile, callback);
+    var newFile = fs.createWriteStream(dest);
+    newFile.once('open', function(fd) {
+        var oldFile = fs.createReadStream(source);
+        oldFile.once('open', function(fd) {
+            util.pump(oldFile, newFile, function(err) {
+                if (err) console.warn(err);
+                callback(err);
+            });
+        });
     });
 }
 
@@ -371,7 +375,7 @@ actions.push(function(next, err) {
                     }
                     else {
                         console.log('Notice: copying file: ' + sourcefile +' to '+ destfile);
-                        return filecopy(sourcefile, destfile, next)
+                        return filecopy(sourcefile, destfile, next);
                     }
                 });
             })
