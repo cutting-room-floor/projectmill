@@ -512,8 +512,41 @@ if (command == "upload") {
     actions.push(function(next, err) {
         if (err) return next(err);
 
-        console.warn('Sorry, I cannot upload yet.')
-        next();
+        var upload = [];
+        Object.keys(config).forEach(function(i) {
+            var data = config[i];
+            if (data.syncAccount && data.syncAccessToken) {
+                upload.push(function(cb, err) {
+                    if (err) return next(err);
+
+                    var args = [];
+                    // tilemill index.js
+                    args.push(path.join(tilemill));
+                    // export command
+                    args.push('export');
+                    // datasource
+                    args.push(i);
+                    // file - todo: file name is wild guesswork ATM.
+                    args.push(path.join(fileDir, 'export', i + '.mbtiles'));
+                    // signal upload
+                    args.push('--format=upload');
+                    // OAuth config.
+                    args.push('--syncAccount=' + data.syncAccount);
+                    args.push('--syncAccessToken=' + data.syncAccessToken);
+
+                    console.log('Notice: ' + process.execPath + ' ' + args.join(' '));
+
+                    // todo get more output from the child process.
+                    spawn(process.execPath, args).on('exit', function(code, signal) {
+                        var err = code ? new Error('Upload failed: '+ i) : null;
+                        cb(err);
+                    });
+                });
+            }
+        });
+        serial(upload, function(err) {
+            next(triageError(err));
+        });
     });
 }
 
