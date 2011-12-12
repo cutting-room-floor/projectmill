@@ -29,18 +29,24 @@ function triageError(err) {
 // Helper: Recursive version or fs.readdir
 function readdirr(dir, callback, dotfiles) {
     var filelist = [],
+        dirlist = [],
         wait = 1;
 
     var done = function(err) {
         if (err) console.warn(err.message);
 
         wait--;
-        if (wait === 0) callback(null, filelist);
+        if (wait === 0) callback(null, filelist, dirlist);
     };
 
     (function read(d, basepath) {
         fs.readdir(path.join(d, basepath), function(err, files) {
             if (err) return callback(err);
+
+            basepath && dirlist.push(basepath);
+            if (!files.length) {
+                return done();
+            }
 
             wait--; // Don't wait on the directory...
             wait += files.length; // ...wait on it's files.
@@ -78,34 +84,23 @@ function readdirr(dir, callback, dotfiles) {
 
 // Helper: Recursive file deletion
 function recursiveDelete(delPath, callback) {
-    readdirr(delPath, function(err, files) {
-        var tree = [],
-            dirs = {};
-
-        files.forEach(function(f) {
-            f = (typeof f == 'object' ? f.target : f);
-            f = path.join(delPath, f);
-            if (dirs[path.dirname(f)] == undefined) {
-                dirs[path.dirname(f)] = f;
-                tree.push(path.dirname(f));
-            }
-            tree.push(f);
-        });
-
+    readdirr(delPath, function(err, files, directories) {
         var steps = [];
-        tree.reverse().forEach(function(p) {
-            if (dirs[p] == undefined) {
-                steps.push(function(next, err) {
-                    if (err) return next(err);
-                    fs.unlink(p, next);
-                });
-            }
-            else {
-                steps.push(function(next, err) {
-                    if (err) return next(err);
-                    fs.rmdir(p, next);
-                });
-            }
+        files.forEach(function(f) {
+            steps.push(function(next, err) {
+                if (err) return next(err);
+                fs.unlink(path.join(delPath, f), next);
+            });
+        });
+        directories.reverse().forEach(function(d) {
+            steps.push(function(next, err) {
+                if (err) return next(err);
+                fs.rmdir(path.join(delPath, d), next);
+            });
+        });
+        steps.push(function(next, err) {
+            if (err) return next(err);
+            fs.rmdir(delPath, next);
         });
         serial(steps, callback);
     }, true);
