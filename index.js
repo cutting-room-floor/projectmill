@@ -375,7 +375,7 @@ actions.push(function(next, err) {
                         return fileprocess(sourcefile, destfile, processMSS(config[i]), next);
                     }
                     else {
-                        console.log('Notice: coping file: ' + sourcefile +' to '+ destfile);
+                        console.log('Notice: copying file: ' + sourcefile +' to '+ destfile);
                         return filecopy(sourcefile, destfile, next)
                     }
                 });
