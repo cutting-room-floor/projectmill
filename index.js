@@ -460,8 +460,12 @@ if (command == "render") {
                 // todo get more output from the child process.
                 // todo get the actual name of the database written to.
                 var nice = spawn('nice', args);
-                nice.stdout.on('data', console.log);
-                nice.stderr.on('data', console.warn);
+                nice.stdout.on('data', function(data) {
+                    console.log(data.toString());
+                });
+                nice.stderr.on('data',  function(data) {
+                    console.warn(data.toString());
+                });
                 nice.on('exit', function(code, signal) {
                     var err = code ? new Error('Render failed: '+ i) : null;
                     cb(err);
@@ -548,8 +552,12 @@ if (command == "upload") {
 
                     // todo get more output from the child process.
                     var tilemill = spawn(process.execPath, args);
-                    tilemill.stdout.on('data', console.log);
-                    tilemill.stderr.on('data', console.warn);
+                    tilemill.stdout.on('data', function(data) {
+                        console.log(data.toString());
+                    });
+                    tilemill.stderr.on('data', function(data) {
+                        console.warn(data.toString());
+                    });
                     tilemill.on('exit', function(code, signal) {
                         var err = code ? new Error('Upload failed: '+ i) : null;
                         cb(err);
