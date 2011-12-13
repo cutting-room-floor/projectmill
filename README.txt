@@ -51,18 +51,18 @@ Additionally, the following options will be passed to TileMill's export commnd
 
 ## Commands
 
-`mill`      Generate new tilemill projects based on the configuration.
+`mill`      Generates new tilemill projects based on configuration.
 
-`render`    Render projects (and mill them first if required).
+`render`    Renders projects that are present in configuration and have been milled.
 
-`upload`    NOT IMPLEMENTED Uploads projects to MapBox hosting (Mill and render first if required);
+`upload`    Uploads projects that are present in configuration and have been rendered.
 
 
 ## Options
 
 -t      Path to the TileMill install
 
--c      specify a config file. (Defaults: `./config.json`)
+-c      specify a configuration file. (Defaults: `./config.json`)
 
 -p      Path to TileMill project folder. (Defaults: `~/Documents/Mapbox`)
 
