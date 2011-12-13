@@ -294,104 +294,106 @@ actions.push(function(next, err, files) {
     next();
 });
 
-// Regardless of the command 'mill' needs to run.
-actions.push(function(next, err) {
-    if (err) return next(err);
+// Mill projects defined in configuration.
+if (command == "mill") {
+    actions.push(function(next, err) {
+        if (err) return next(err);
 
-    var mill = [];
-    Object.keys(config).forEach(function(i) {
+        var mill = [];
+        Object.keys(config).forEach(function(i) {
 
-        mill.push(function(cb, err) {
-            err = triageError(err);
-            if (err) return cb(err);
+            mill.push(function(cb, err) {
+                err = triageError(err);
+                if (err) return cb(err);
 
-            path.exists(config[i].destination, cb);
-        });
-        mill.push(function(cb, exists) {
-            if (!exists) return cb();
+                path.exists(config[i].destination, cb);
+            });
+            mill.push(function(cb, exists) {
+                if (!exists) return cb();
 
-            if (replaceExisting) {
-                console.log('Notice: removing project '+ config[i].destination);
-                recursiveDelete(config[i].destination, cb);
-            }
-            else {
-                var e = new Error('Skipping project '+ i);
-                e.name = "ProjectMill";
-                cb(e);
-            }
-        });
-        mill.push(function(cb, err) {
-            if (err) return cb(err);
-
-            readdirr(config[i].source, cb);
-        });
-        mill.push(function(cb, err, files) {
-            if (err) return cb(err);
-
-            var setup = [];
-            files.forEach(function(filename) {
-                // Handle symlinks which come in as an object.
-                var linkSource = '';
-                if (typeof filename != 'string') {
-                     linkSource = filename.source;
-                     filename = filename.target
+                if (replaceExisting) {
+                    console.log('Notice: removing project '+ config[i].destination);
+                    recursiveDelete(config[i].destination, cb);
                 }
-
-                var destfile = path.join(config[i].destination, filename),
-                    destdir = path.dirname(destfile),
-                    sourcefile = path.join(config[i].source, filename);
-
-                // In the future the 'mml' file will always be called
-                // 'project.mml', but currently this isn't the case.
-                // TODO delete this when https://github.com/mapbox/tilemill/pull/970
-                //      is merged.
-                if (path.extname(filename) == '.mml' && filename != 'project.mml') {
-                    destfile = path.join(config[i].destination, i +'.mml');
+                else {
+                    var e = new Error('Skipping project '+ i);
+                    e.name = "ProjectMill";
+                    cb(e);
                 }
+            });
+            mill.push(function(cb, err) {
+                if (err) return cb(err);
 
-                setup.push(function(next) {
-                    path.exists(destdir, next);
-                });
-                setup.push(function(next, err, exists) {
-                    if (exists) return next();
+                readdirr(config[i].source, cb);
+            });
+            mill.push(function(cb, err, files) {
+                if (err) return cb(err);
 
-                    console.log('Notice: creating directory: ' + destdir);
-                    mkdirp(destdir, '0777', next);
-                });
-                setup.push(function(next, err) {
-                    if (err) next(err);
+                var setup = [];
+                files.forEach(function(filename) {
+                    // Handle symlinks which come in as an object.
+                    var linkSource = '';
+                    if (typeof filename != 'string') {
+                         linkSource = filename.source;
+                         filename = filename.target
+                    }
 
-                    if (linkSource) {
-                        console.log('Notice: creating symlink: ' + destfile + ' -> ' + linkSource);
-                        return fs.symlink(linkSource, destfile, next);
+                    var destfile = path.join(config[i].destination, filename),
+                        destdir = path.dirname(destfile),
+                        sourcefile = path.join(config[i].source, filename);
+
+                    // In the future the 'mml' file will always be called
+                    // 'project.mml', but currently this isn't the case.
+                    // TODO delete this when https://github.com/mapbox/tilemill/pull/970
+                    //      is merged.
+                    if (path.extname(filename) == '.mml' && filename != 'project.mml') {
+                        destfile = path.join(config[i].destination, i +'.mml');
                     }
-                    else if (config[i].mml && path.extname(filename) == '.mml') {
-                        console.log('Notice: processing mml file: ' + sourcefile +' to '+ destfile);
-                        return fileprocess(sourcefile, destfile, processMML(config[i]), next);
-                    }
-                    else if (config[i].cartoVars && path.extname(filename) == '.mss') {
-                        console.log('Notice: processing carto file: ' + sourcefile +' to '+ destfile);
-                        return fileprocess(sourcefile, destfile, processMSS(config[i]), next);
-                    }
-                    else {
-                        console.log('Notice: copying file: ' + sourcefile +' to '+ destfile);
-                        return filecopy(sourcefile, destfile, next);
-                    }
+
+                    setup.push(function(next) {
+                        path.exists(destdir, next);
+                    });
+                    setup.push(function(next, err, exists) {
+                        if (exists) return next();
+
+                        console.log('Notice: creating directory: ' + destdir);
+                        mkdirp(destdir, '0777', next);
+                    });
+                    setup.push(function(next, err) {
+                        if (err) next(err);
+
+                        if (linkSource) {
+                            console.log('Notice: creating symlink: ' + destfile + ' -> ' + linkSource);
+                            return fs.symlink(linkSource, destfile, next);
+                        }
+                        else if (config[i].mml && path.extname(filename) == '.mml') {
+                            console.log('Notice: processing mml file: ' + sourcefile +' to '+ destfile);
+                            return fileprocess(sourcefile, destfile, processMML(config[i]), next);
+                        }
+                        else if (config[i].cartoVars && path.extname(filename) == '.mss') {
+                            console.log('Notice: processing carto file: ' + sourcefile +' to '+ destfile);
+                            return fileprocess(sourcefile, destfile, processMSS(config[i]), next);
+                        }
+                        else {
+                            console.log('Notice: copying file: ' + sourcefile +' to '+ destfile);
+                            return filecopy(sourcefile, destfile, next);
+                        }
+                    });
+                })
+                serial(setup, function(err) {
+                    if (err) console.warn(err);
+                    cb();
                 });
-            })
-            serial(setup, function(err) {
-                if (err) console.warn(err);
-                cb();
             });
         });
+        serial(mill, function(err) {
+            next(triageError(err));
+        });
     });
-    serial(mill, function(err) {
-        next(triageError(err));
-    });
-});
+}
 
-// If trying to render, or upload, do it now!
-if (command == "render" || command == "upload") {
+// Render all available projects.
+if (command == "render") {
     var spawn = require('child_process').spawn,
         sqlite3 = require('sqlite3');
 
@@ -511,8 +513,9 @@ if (command == "render" || command == "upload") {
     });
 }
 
-// Uploading... yea...
+// Upload available mbtiles files.
 if (command == "upload") {
+    var spawn = require('child_process').spawn;
     actions.push(function(next, err) {
         if (err) return next(err);
 
