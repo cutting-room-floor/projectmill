@@ -233,8 +233,7 @@ catch(err) {
 }
 
 // Assemble the main actions.
-var actions = [],
-    cli = require('readline').createInterface(process.stdin, process.stdout);
+var actions = [];
 
 // Get our configuration
 actions.push(function(next, err) {
@@ -575,8 +574,4 @@ if (command == "upload") {
 serial(actions, function(err) {
     if (err) console.warn(err.toString());
     console.log('Done.');
-
-    // Interface cleanup
-    cli.close();
-    process.stdin.destroy();
 });
