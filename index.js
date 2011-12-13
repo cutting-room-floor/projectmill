@@ -224,7 +224,7 @@ if (command != 'mill' && command != 'render' && command != 'upload') {
 // Try to locate TileMill
 var tilemillPath = argv.t || 'tilemill';
 try {
-    var tilemill = require.resolve(tilemillPath);
+    tilemillPath = require.resolve(tilemillPath);
 }
 catch(err) {
     console.warn('Error: could not locate TileMill');
@@ -438,7 +438,7 @@ if (command == "render") {
                 // node command
                 args.push(process.execPath);
                 // tilemill index.js
-                args.push(path.join(tilemill));
+                args.push(tilemillPath);
                 // export command
                 args.push('export');
                 // datasource
@@ -535,7 +535,7 @@ if (command == "upload") {
 
                     var args = [];
                     // tilemill index.js
-                    args.push(path.join(tilemill));
+                    args.push(tilemillPath);
                     // export command
                     args.push('export');
                     // datasource
