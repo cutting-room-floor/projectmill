@@ -530,6 +530,7 @@ if (command == "upload") {
             var data = config[i];
             if (data.syncAccount && data.syncAccessToken) {
                 upload.push(function(cb, err) {
+                    err = triageError(err);
                     if (err) return next(err);
 
                     var args = [];
@@ -558,7 +559,11 @@ if (command == "upload") {
                         console.warn(data.toString());
                     });
                     tilemill.on('exit', function(code, signal) {
-                        var err = code ? new Error('Upload failed: '+ i) : null;
+                        var err = null;
+                        if (code) {
+                            err = new Error('Upload failed: '+ i);
+                            err.name = 'ProjectMill';
+                        }
                         cb(err);
                     });
                 });
