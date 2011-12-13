@@ -311,7 +311,7 @@ actions.push(function(next, err) {
             if (!exists) return cb();
 
             if (replaceExisting) {
-                console.warn('Notice: removing project '+ config[i].destination);
+                console.log('Notice: removing project '+ config[i].destination);
                 recursiveDelete(config[i].destination, cb);
             }
             else {
