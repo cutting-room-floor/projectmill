@@ -255,9 +255,9 @@ actions.push(function(next, err, data) {
     data.forEach(function(v) {
         // TODO check for other required elements.
         if (v.source && v.destination) {
+            config[v.destination] = v;
             v.source = path.join(fileDir, 'project', v.source);
             v.destination = path.join(fileDir, 'project', v.destination);
-            config[v.destination] = v;
         }
         else {
             console.warn("Error: project missing required elements >> " + JSON.stringify(v));
