@@ -421,6 +421,7 @@ if (command == "render") {
                 }
             });
             render.push(function(cb, err) {
+                err = triageError(err);
                 if (err) return cb(err);
 
                 if (data.format == undefined) {
@@ -462,8 +463,14 @@ if (command == "render") {
                     console.warn(data.toString());
                 });
                 nice.on('exit', function(code, signal) {
-                    var err = code ? new Error('Render failed: '+ i) : null;
-                    if (!err) console.log('Notice: rendered ' + destfile);
+                    var err = null;
+                    if (code) {
+                        err = new Error('Render failed: '+ i);
+                        err.name = 'ProjectMill';
+                    }
+                    else {
+                        console.log('Notice: rendered ' + destfile);
+                    }
                     cb(err);
                 });
             });
