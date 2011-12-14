@@ -454,7 +454,6 @@ if (command == "render") {
 
                 console.log('Notice: nice ' + args.join(' '));
 
-                // todo get more output from the child process.
                 // todo get the actual name of the database written to.
                 var nice = spawn('nice', args);
                 nice.stdout.on('data', function(data) {
