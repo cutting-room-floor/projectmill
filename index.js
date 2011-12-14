@@ -353,26 +353,21 @@ if (command == "mill") {
                     setup.push(function(next, err, exists) {
                         if (exists) return next();
 
-                        console.log('Notice: creating directory: ' + destdir);
                         mkdirp(destdir, '0777', next);
                     });
                     setup.push(function(next, err) {
                         if (err) next(err);
 
                         if (linkSource) {
-                            console.log('Notice: creating symlink: ' + destfile + ' -> ' + linkSource);
                             return fs.symlink(linkSource, destfile, next);
                         }
                         else if (config[i].mml && path.extname(filename) == '.mml') {
-                            console.log('Notice: processing mml file: ' + sourcefile +' to '+ destfile);
                             return fileprocess(sourcefile, destfile, processMML(config[i]), next);
                         }
                         else if (config[i].cartoVars && path.extname(filename) == '.mss') {
-                            console.log('Notice: processing carto file: ' + sourcefile +' to '+ destfile);
                             return fileprocess(sourcefile, destfile, processMSS(config[i]), next);
                         }
                         else {
-                            console.log('Notice: copying file: ' + sourcefile +' to '+ destfile);
                             return filecopy(sourcefile, destfile, next);
                         }
                     });
@@ -381,6 +376,10 @@ if (command == "mill") {
                     if (err) console.warn(err);
                     cb();
                 });
+            });
+            mill.push(function(cb, err) {
+                if (!err) console.log('Notice: created project '+ config[i].destination);
+                cb(err);
             });
         });
         serial(mill, function(err) {
@@ -452,7 +451,7 @@ if (command == "render") {
                 if (data.maxzoom) args.push('--maxzoom=' + data.maxzoom);
                 if (data.maxzoom) args.push('--files=' + fileDir);
 
-                console.log('Notice: nice ' + args.join(' '));
+                console.log('Notice: spawning nice ' + args.join(' '));
 
                 // todo get the actual name of the database written to.
                 var nice = spawn('nice', args);
@@ -464,6 +463,7 @@ if (command == "render") {
                 });
                 nice.on('exit', function(code, signal) {
                     var err = code ? new Error('Render failed: '+ i) : null;
+                    if (!err) console.log('Notice: rendered ' + destfile);
                     cb(err);
                 });
             });
@@ -497,7 +497,6 @@ if (command == "render") {
                     rows.push(function(nextRow, err, stmt) {
                         if (err) return nextRow(err);
 
-                        console.log('Notice: writing custom metadata: '+ k +' -> '+ data.MBmeta[k]);
                         stmt.run(k, data.MBmeta[k], function(err){
                             if (err) console.warn(err);
                             stmt.finalize(nextRow);
@@ -508,6 +507,10 @@ if (command == "render") {
                     delete db;
                     cb(err, db);
                 });
+            });
+            render.push(function(cb, err) {
+                if (!err) console.log('Notice: added metadata to ' + destfile);
+                cb(err);
             });
         });
         serial(render, function(err) {
@@ -530,22 +533,25 @@ if (command == "upload") {
                     err = triageError(err);
                     if (err) return next(err);
 
-                    var args = [];
+                    // todo - mbtilesFile name is guess work.
+                    var args = [],
+                        mbtilesFile = path.join(fileDir, 'export', i + '.mbtiles');
+
                     // tilemill index.js
                     args.push(tilemillPath);
                     // export command
                     args.push('export');
                     // datasource
                     args.push(i);
-                    // file - todo: file name is wild guesswork ATM.
-                    args.push(path.join(fileDir, 'export', i + '.mbtiles'));
+                    // file
+                    args.push(mbtilesFile);
                     // signal upload
                     args.push('--format=upload');
                     // OAuth config.
                     args.push('--syncAccount=' + data.syncAccount);
                     args.push('--syncAccessToken=' + data.syncAccessToken);
 
-                    console.log('Notice: ' + process.execPath + ' ' + args.join(' '));
+                    console.log('Notice: spawning ' + process.execPath + ' ' + args.join(' '));
 
                     // todo get more output from the child process.
                     var tilemill = spawn(process.execPath, args);
@@ -560,6 +566,9 @@ if (command == "upload") {
                         if (code) {
                             err = new Error('Upload failed: '+ i);
                             err.name = 'ProjectMill';
+                        }
+                        else {
+                            console.log('Notice: uploaded ' + mbtilesFile + ' to ' + data.syncAccount);
                         }
                         cb(err);
                     });
