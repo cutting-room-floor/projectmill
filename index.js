@@ -255,6 +255,8 @@ actions.push(function(next, err, data) {
     data.forEach(function(v) {
         // TODO check for other required elements.
         if (v.source && v.destination) {
+            v.source = path.join(fileDir, 'project', v.source);
+            v.destination = path.join(fileDir, 'project', v.destination);
             config[v.destination] = v;
         }
         else {
@@ -264,37 +266,33 @@ actions.push(function(next, err, data) {
     next();
 });
 
-// Prepare Configuration
-actions.push(function(next, err) {
-    if (err) return next(err);
-
-    var projectDir = path.join(fileDir, 'project');
-    fs.readdir(projectDir, next);
-});
-actions.push(function(next, err, files) {
-    if (err) return next(err);
-
-    var paths = {};
-    files.forEach(function(v) {
-        if (v[0] == '.') return;
-        paths[v] = path.join(fileDir, 'project', v);
-    });
-
-    for (var i in config) {
-        if (paths[config[i].source] == undefined) {
-            console.warn("Error: source project doesn't exist >> " + JSON.stringify(config[i]));
-            delete config[i];
-        }
-        else {
-            config[i].source = paths[config[i].source];
-            config[i].destination = path.join(fileDir, 'project', config[i].destination);
-        }
-    }
-    next();
-});
-
 // Mill projects defined in configuration.
 if (command == "mill") {
+
+    // Validate source paths.
+    actions.push(function(next, err) {
+        if (err) return next(err);
+
+        var projectDir = path.join(fileDir, 'project');
+        fs.readdir(projectDir, next);
+    });
+    actions.push(function(next, err, files) {
+        if (err) return next(err);
+
+        var paths = {};
+        files.forEach(function(v) {
+            if (v[0] == '.') return;
+            paths[path.join(fileDir, 'project', v)] = path.join(fileDir, 'project', v);
+        });
+        for (var i in config) {
+            if (paths[config[i].source] == undefined) {
+                console.warn("Error: source project doesn't exist >> " + JSON.stringify(config[i]));
+                delete config[i];
+            }
+        }
+        next();
+    });
+
     actions.push(function(next, err) {
         if (err) return next(err);
 
