@@ -4,7 +4,9 @@ ProjectMill
 Need to generate a bunch of TileMill projects that are nearly identical and
 then render them all out? What to script that? We gotcha covered.
 
-Usage: ./index.js <command> [options]
+Usage: `./index.js <command> [options]`
+
+Example: `./index.js --mill --render -c config.example.json -t ../tilemill/`
 
 ## Installation
 
@@ -51,11 +53,14 @@ Additionally, the following options will be passed to TileMill's export commnd
 
 ## Commands
 
-`mill`      Generates new tilemill projects based on configuration.
+ProjectMill accepts the following commands. They can be issued either
+individually or together.
 
-`render`    Renders projects that are present in configuration and have been milled.
+`--mill`      Generates new tilemill projects based on configuration.
 
-`upload`    Uploads projects that are present in configuration and have been rendered.
+`--render`    Renders projects that are present in configuration and have been milled.
+
+`--upload`    Uploads projects that are present in configuration and have been rendered.
 
 
 ## Options

@@ -98,12 +98,11 @@ var config = {},
     tilemill = '',
     argv = require('optimist').usage(usage).argv,
     fileDir = argv.p || path.join(process.env.HOME, 'Documents', 'MapBox'),
-    replaceExisting = argv.f || false,
-    command = argv._.pop();
+    replaceExisting = argv.f || false;
 
-// If no command was issued bail. Perhaps we should have a default?
-if (command != 'mill' && command != 'render' && command != 'upload') {
-    console.warn('Error: invalid or missing command');
+// If no command was issued bail.
+if (!argv.mill && !argv.render && !argv.upload) {
+    console.warn('Error: missing command. Available commands are `--mill`, `--render`, `--upload`');
     console.warn(usage);
     process.exit(1);
 }
@@ -154,7 +153,7 @@ actions.push(function(next, err, data) {
 });
 
 // Mill projects defined in configuration.
-if (command == "mill") {
+if (argv.mill) {
 
     // Validate source paths.
     actions.push(function(next, err) {
@@ -276,7 +275,7 @@ if (command == "mill") {
 }
 
 // Render all available projects.
-if (command == "render") {
+if (argv.render) {
     var spawn = require('child_process').spawn,
         sqlite3 = require('sqlite3');
 
@@ -413,7 +412,7 @@ if (command == "render") {
 }
 
 // Upload available mbtiles files.
-if (command == "upload") {
+if (argv.upload) {
     var spawn = require('child_process').spawn;
     actions.push(function(next, err) {
         if (err) return next(err);
