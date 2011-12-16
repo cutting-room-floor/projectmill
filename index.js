@@ -2,7 +2,7 @@
 
 var fs = require('fs'),
     path = require('path'),
-    util = require('util');
+    utils = require('./lib/utils');
 
 // Helper: Run an array of functions in serial
 function serial(steps, done) {
@@ -24,119 +24,6 @@ function triageError(err) {
         err = null;
     }
     return err;
-}
-
-// Helper: Recursive version or fs.readdir
-function readdirr(dir, callback, dotfiles) {
-    var filelist = [],
-        dirlist = [],
-        wait = 1;
-
-    var done = function(err) {
-        if (err) console.warn(err.message);
-
-        wait--;
-        if (wait === 0) callback(null, filelist, dirlist);
-    };
-
-    (function read(d, basepath) {
-        fs.readdir(path.join(d, basepath), function(err, files) {
-            if (err) return callback(err);
-
-            basepath && dirlist.push(basepath);
-            if (!files.length) {
-                return done();
-            }
-
-            wait--; // Don't wait on the directory...
-            wait += files.length; // ...wait on it's files.
-
-            files.forEach(function(f) {
-                // Skip dotfiles
-                if (f[0] == '.' && !dotfiles) return done();
-
-                f = path.join(basepath, f);
-                var filepath = path.join(d, f)
-
-                fs.lstat(filepath, function(err, stats) {
-                    if (err) return done(err);
-
-                    if (stats.isDirectory()) {
-                        return read(dir, f);
-                    }
-                    else if (stats.isFile()) {
-                        filelist.push(f);
-                        return done();
-                    }
-                    else if (stats.isSymbolicLink()) {
-                        fs.readlink(filepath, function(err, src) {
-                            if (err) return done(err);
-
-                            filelist.push({source: src, target: f});
-                            return done();
-                        });
-                    }
-                });  
-            });
-        });
-    })(dir);
-}
-
-// Helper: Recursive file deletion
-function recursiveDelete(delPath, callback) {
-    readdirr(delPath, function(err, files, directories) {
-        var steps = [];
-        files.forEach(function(f) {
-            steps.push(function(next, err) {
-                if (err) return next(err);
-                fs.unlink(path.join(delPath, f), next);
-            });
-        });
-        directories.reverse().forEach(function(d) {
-            steps.push(function(next, err) {
-                if (err) return next(err);
-                fs.rmdir(path.join(delPath, d), next);
-            });
-        });
-        steps.push(function(next, err) {
-            if (err) return next(err);
-            fs.rmdir(delPath, next);
-        });
-        serial(steps, callback);
-    }, true);
-}
-
-// Helper: Recursive version or fs.mkdir
-// https://gist.github.com/707661
-function mkdirp(p, mode, f) {
-    var cb = f || function() {};
-    if (p.charAt(0) != '/') {
-        cb(new Error('Relative path: ' + p));
-        return;
-    }
-
-    var ps = path.normalize(p).split('/');
-    path.exists(p, function(exists) {
-        if (exists) return cb(null);
-        mkdirp(ps.slice(0, -1).join('/'), mode, function(err) {
-            if (err && err.errno != constants.EEXIST) return cb(err);
-            fs.mkdir(p, mode, cb);
-        });
-    });
-};
-
-// Helper: Copy a file
-function filecopy(source, dest, callback) {
-    var newFile = fs.createWriteStream(dest);
-    newFile.once('open', function(fd) {
-        var oldFile = fs.createReadStream(source);
-        oldFile.once('open', function(fd) {
-            util.pump(oldFile, newFile, function(err) {
-                if (err) console.warn(err);
-                callback(err);
-            });
-        });
-    });
 }
 
 // Helper: Process a file.
@@ -310,7 +197,7 @@ if (command == "mill") {
 
                 if (replaceExisting) {
                     console.log('Notice: removing project '+ config[i].destination);
-                    recursiveDelete(config[i].destination, cb);
+                    utils.recursiveDelete(config[i].destination, cb);
                 }
                 else {
                     var e = new Error('Skipping project '+ i);
@@ -321,7 +208,7 @@ if (command == "mill") {
             mill.push(function(cb, err) {
                 if (err) return cb(err);
 
-                readdirr(config[i].source, cb);
+                utils.readdirr(config[i].source, cb);
             });
             mill.push(function(cb, err, files) {
                 if (err) return cb(err);
@@ -353,7 +240,7 @@ if (command == "mill") {
                     setup.push(function(next, err, exists) {
                         if (exists) return next();
 
-                        mkdirp(destdir, '0777', next);
+                        utils.mkdirp(destdir, '0777', next);
                     });
                     setup.push(function(next, err) {
                         if (err) next(err);
@@ -368,7 +255,7 @@ if (command == "mill") {
                             return fileprocess(sourcefile, destfile, processMSS(config[i]), next);
                         }
                         else {
-                            return filecopy(sourcefile, destfile, next);
+                            return utils.filecopy(sourcefile, destfile, next);
                         }
                     });
                 })
