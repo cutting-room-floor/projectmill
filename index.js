@@ -443,27 +443,39 @@ if (argv.upload) {
                     args.push('--syncAccount=' + data.syncAccount);
                     args.push('--syncAccessToken=' + data.syncAccessToken);
 
-                    console.log('Notice: spawning ' + process.execPath + ' ' + args.join(' '));
-
                     // todo get more output from the child process.
-                    var tilemill = spawn(process.execPath, args);
-                    tilemill.stdout.on('data', function(data) {
-                        console.log(data.toString());
-                    });
-                    tilemill.stderr.on('data', function(data) {
-                        console.warn(data.toString());
-                    });
-                    tilemill.on('exit', function(code, signal) {
-                        var err = null;
-                        if (code) {
-                            err = new Error('Upload failed: '+ i);
-                            err.name = 'ProjectMill';
-                        }
-                        else {
-                            console.log('Notice: uploaded ' + mbtilesFile + ' to ' + data.syncAccount);
-                        }
-                        cb(err);
-                    });
+                    var retries = 0;
+                    var upload = function(callback) {
+                        var retry = false;
+                        console.log('Notice: spawning ' + process.execPath + ' ' + args.join(' '));
+                        var tilemill = spawn(process.execPath, args);
+                        tilemill.stdout.on('data', function(data) {
+                            console.log(data.toString());
+                        });
+                        tilemill.stderr.on('data', function(data) {
+                            var error = data.toString();
+                            console.warn(error);
+                            retry = error.match(/.*S3 is not available.*/) && (++retries < 4);
+                        });
+                        tilemill.on('exit', function(code, signal) {
+                            var err = null;
+                            if (code && retry) {
+                                console.log('Retrying upload in ' + retries + ' second(s) (attempt ' + retries + ')');
+                                return setTimeout(function() {
+                                    upload(callback);
+                                }, 1000 * retries);
+                            }
+                            if (code) {
+                                err = new Error('Upload failed: '+ i);
+                                err.name = 'ProjectMill';
+                            }
+                            else {
+                                console.log('Notice: uploaded ' + mbtilesFile + ' to ' + data.syncAccount);
+                            }
+                            callback(err);
+                        });
+                    }
+                    upload(cb);
                 });
             }
         });
