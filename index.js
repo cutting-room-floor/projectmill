@@ -29,18 +29,24 @@ function triageError(err) {
 // Helper: Recursive version or fs.readdir
 function readdirr(dir, callback, dotfiles) {
     var filelist = [],
+        dirlist = [],
         wait = 1;
 
     var done = function(err) {
         if (err) console.warn(err.message);
 
         wait--;
-        if (wait === 0) callback(null, filelist);
+        if (wait === 0) callback(null, filelist, dirlist);
     };
 
     (function read(d, basepath) {
         fs.readdir(path.join(d, basepath), function(err, files) {
             if (err) return callback(err);
+
+            basepath && dirlist.push(basepath);
+            if (!files.length) {
+                return done();
+            }
 
             wait--; // Don't wait on the directory...
             wait += files.length; // ...wait on it's files.
@@ -78,34 +84,23 @@ function readdirr(dir, callback, dotfiles) {
 
 // Helper: Recursive file deletion
 function recursiveDelete(delPath, callback) {
-    readdirr(delPath, function(err, files) {
-        var tree = [],
-            dirs = {};
-
-        files.forEach(function(f) {
-            f = (typeof f == 'object' ? f.target : f);
-            f = path.join(delPath, f);
-            if (dirs[path.dirname(f)] == undefined) {
-                dirs[path.dirname(f)] = f;
-                tree.push(path.dirname(f));
-            }
-            tree.push(f);
-        });
-
+    readdirr(delPath, function(err, files, directories) {
         var steps = [];
-        tree.reverse().forEach(function(p) {
-            if (dirs[p] == undefined) {
-                steps.push(function(next, err) {
-                    if (err) return next(err);
-                    fs.unlink(p, next);
-                });
-            }
-            else {
-                steps.push(function(next, err) {
-                    if (err) return next(err);
-                    fs.rmdir(p, next);
-                });
-            }
+        files.forEach(function(f) {
+            steps.push(function(next, err) {
+                if (err) return next(err);
+                fs.unlink(path.join(delPath, f), next);
+            });
+        });
+        directories.reverse().forEach(function(d) {
+            steps.push(function(next, err) {
+                if (err) return next(err);
+                fs.rmdir(path.join(delPath, d), next);
+            });
+        });
+        steps.push(function(next, err) {
+            if (err) return next(err);
+            fs.rmdir(delPath, next);
         });
         serial(steps, callback);
     }, true);
@@ -132,11 +127,15 @@ function mkdirp(p, mode, f) {
 
 // Helper: Copy a file
 function filecopy(source, dest, callback) {
-    newFile = fs.createWriteStream(dest);
-    oldFile = fs.createReadStream(source);
-
-    newFile.once('open', function(fd){
-        util.pump(oldFile, newFile, callback);
+    var newFile = fs.createWriteStream(dest);
+    newFile.once('open', function(fd) {
+        var oldFile = fs.createReadStream(source);
+        oldFile.once('open', function(fd) {
+            util.pump(oldFile, newFile, function(err) {
+                if (err) console.warn(err);
+                callback(err);
+            });
+        });
     });
 }
 
@@ -212,6 +211,7 @@ var config = {},
     tilemill = '',
     argv = require('optimist').usage(usage).argv,
     fileDir = argv.p || path.join(process.env.HOME, 'Documents', 'MapBox'),
+    replaceExisting = argv.f || false,
     command = argv._.pop();
 
 // If no command was issued bail. Perhaps we should have a default?
@@ -224,7 +224,7 @@ if (command != 'mill' && command != 'render' && command != 'upload') {
 // Try to locate TileMill
 var tilemillPath = argv.t || 'tilemill';
 try {
-    var tilemill = require.resolve(tilemillPath);
+    tilemillPath = require.resolve(tilemillPath);
 }
 catch(err) {
     console.warn('Error: could not locate TileMill');
@@ -233,8 +233,7 @@ catch(err) {
 }
 
 // Assemble the main actions.
-var actions = [],
-    cli = require('readline').createInterface(process.stdin, process.stdout);
+var actions = [];
 
 // Get our configuration
 actions.push(function(next, err) {
@@ -257,6 +256,8 @@ actions.push(function(next, err, data) {
         // TODO check for other required elements.
         if (v.source && v.destination) {
             config[v.destination] = v;
+            v.source = path.join(fileDir, 'project', v.source);
+            v.destination = path.join(fileDir, 'project', v.destination);
         }
         else {
             console.warn("Error: project missing required elements >> " + JSON.stringify(v));
@@ -265,54 +266,50 @@ actions.push(function(next, err, data) {
     next();
 });
 
-// Prepare Configuration
-actions.push(function(next, err) {
-    if (err) return next(err);
+// Mill projects defined in configuration.
+if (command == "mill") {
 
-    var projectDir = path.join(fileDir, 'project');
-    fs.readdir(projectDir, next);
-});
-actions.push(function(next, err, files) {
-    if (err) return next(err);
+    // Validate source paths.
+    actions.push(function(next, err) {
+        if (err) return next(err);
 
-    var paths = {};
-    files.forEach(function(v) {
-        if (v[0] == '.') return;
-        paths[v] = path.join(fileDir, 'project', v);
+        var projectDir = path.join(fileDir, 'project');
+        fs.readdir(projectDir, next);
+    });
+    actions.push(function(next, err, files) {
+        if (err) return next(err);
+
+        var paths = {};
+        files.forEach(function(v) {
+            if (v[0] == '.') return;
+            paths[path.join(fileDir, 'project', v)] = path.join(fileDir, 'project', v);
+        });
+        for (var i in config) {
+            if (paths[config[i].source] == undefined) {
+                console.warn("Error: source project doesn't exist >> " + JSON.stringify(config[i]));
+                delete config[i];
+            }
+        }
+        next();
     });
 
-    for (var i in config) {
-        if (paths[config[i].source] == undefined) {
-            console.warn("Error: source project doesn't exist >> " + JSON.stringify(config[i]));
-            delete config[i];
-        }
-        else {
-            config[i].source = paths[config[i].source];
-            config[i].destination = path.join(fileDir, 'project', config[i].destination);
-        }
-    }
-    next();
-});
+    actions.push(function(next, err) {
+        if (err) return next(err);
 
-// Regardless of the command 'mill' needs to run.
-actions.push(function(next, err) {
-    if (err) return next(err);
+        var mill = [];
+        Object.keys(config).forEach(function(i) {
 
-    var mill = [];
-    Object.keys(config).forEach(function(i) {
+            mill.push(function(cb, err) {
+                err = triageError(err);
+                if (err) return cb(err);
 
-        mill.push(function(cb, err) {
-            err = triageError(err);
-            if (err) return cb(err);
+                path.exists(config[i].destination, cb);
+            });
+            mill.push(function(cb, exists) {
+                if (!exists) return cb();
 
-            path.exists(config[i].destination, cb);
-        });
-        mill.push(function(cb, exists) {
-            if (!exists) return cb();
-
-            cli.question('Project '+ i +' already exists. Re-mill? (y/N): ', function(r){
-                if (r.toLowerCase() === "y") {
-                    console.warn('Notice: removing project '+ config[i].destination);
+                if (replaceExisting) {
+                    console.log('Notice: removing project '+ config[i].destination);
                     recursiveDelete(config[i].destination, cb);
                 }
                 else {
@@ -321,79 +318,78 @@ actions.push(function(next, err) {
                     cb(e);
                 }
             });
-        });
-        mill.push(function(cb, err) {
-            if (err) return cb(err);
+            mill.push(function(cb, err) {
+                if (err) return cb(err);
 
-            readdirr(config[i].source, cb);
-        });
-        mill.push(function(cb, err, files) {
-            if (err) return cb(err);
+                readdirr(config[i].source, cb);
+            });
+            mill.push(function(cb, err, files) {
+                if (err) return cb(err);
 
-            var setup = [];
-            files.forEach(function(filename) {
-                // Handle symlinks which come in as an object.
-                var linkSource = '';
-                if (typeof filename != 'string') {
-                     linkSource = filename.source;
-                     filename = filename.target
-                }
+                var setup = [];
+                files.forEach(function(filename) {
+                    // Handle symlinks which come in as an object.
+                    var linkSource = '';
+                    if (typeof filename != 'string') {
+                         linkSource = filename.source;
+                         filename = filename.target
+                    }
 
-                var destfile = path.join(config[i].destination, filename),
-                    destdir = path.dirname(destfile),
-                    sourcefile = path.join(config[i].source, filename);
+                    var destfile = path.join(config[i].destination, filename),
+                        destdir = path.dirname(destfile),
+                        sourcefile = path.join(config[i].source, filename);
 
-                // In the future the 'mml' file will always be called
-                // 'project.mml', but currently this isn't the case.
-                // TODO delete this when https://github.com/mapbox/tilemill/pull/970
-                //      is merged.
-                if (path.extname(filename) == '.mml' && filename != 'project.mml') {
-                    destfile = path.join(config[i].destination, i +'.mml');
-                }
+                    // In the future the 'mml' file will always be called
+                    // 'project.mml', but currently this isn't the case.
+                    // TODO delete this when https://github.com/mapbox/tilemill/pull/970
+                    //      is merged.
+                    if (path.extname(filename) == '.mml' && filename != 'project.mml') {
+                        destfile = path.join(config[i].destination, i +'.mml');
+                    }
 
-                setup.push(function(next) {
-                    path.exists(destdir, next);
+                    setup.push(function(next) {
+                        path.exists(destdir, next);
+                    });
+                    setup.push(function(next, err, exists) {
+                        if (exists) return next();
+
+                        mkdirp(destdir, '0777', next);
+                    });
+                    setup.push(function(next, err) {
+                        if (err) next(err);
+
+                        if (linkSource) {
+                            return fs.symlink(linkSource, destfile, next);
+                        }
+                        else if (config[i].mml && path.extname(filename) == '.mml') {
+                            return fileprocess(sourcefile, destfile, processMML(config[i]), next);
+                        }
+                        else if (config[i].cartoVars && path.extname(filename) == '.mss') {
+                            return fileprocess(sourcefile, destfile, processMSS(config[i]), next);
+                        }
+                        else {
+                            return filecopy(sourcefile, destfile, next);
+                        }
+                    });
+                })
+                serial(setup, function(err) {
+                    if (err) console.warn(err);
+                    cb();
                 });
-                setup.push(function(next, err, exists) {
-                    if (exists) next();
-
-                    console.log('Notice: creating directory: ' + destdir);
-                    mkdirp(destdir, '0777', next);
-                });
-                setup.push(function(next, err) {
-                    if (err) next(err);
-
-                    if (linkSource) {
-                        console.log('Notice: creating symlink: ' + destfile + ' -> ' + linkSource);
-                        return fs.symlink(linkSource, destfile, next);
-                    }
-                    else if (config[i].mml && path.extname(filename) == '.mml') {
-                        console.log('Notice: processing mml file: ' + sourcefile +' to '+ destfile);
-                        return fileprocess(sourcefile, destfile, processMML(config[i]), next);
-                    }
-                    else if (config[i].cartoVars && path.extname(filename) == '.mss') {
-                        console.log('Notice: processing carto file: ' + sourcefile +' to '+ destfile);
-                        return fileprocess(sourcefile, destfile, processMSS(config[i]), next);
-                    }
-                    else {
-                        console.log('Notice: coping file: ' + sourcefile +' to '+ destfile);
-                        return filecopy(sourcefile, destfile, next)
-                    }
-                });
-            })
-            serial(setup, function(err) {
-                if (err) console.warn(err);
-                cb();
+            });
+            mill.push(function(cb, err) {
+                if (!err) console.log('Notice: created project '+ config[i].destination);
+                cb(err);
             });
         });
+        serial(mill, function(err) {
+            next(triageError(err));
+        });
     });
-    serial(mill, function(err) {
-        next(triageError(err));
-    });
-});
+}
 
-// If trying to render, or upload, do it now!
-if (command == "render" || command == "upload") {
+// Render all available projects.
+if (command == "render") {
     var spawn = require('child_process').spawn,
         sqlite3 = require('sqlite3');
 
@@ -414,17 +410,15 @@ if (command == "render" || command == "upload") {
             render.push(function(cb, exists) {
                 if (!exists) return cb();
 
-                cli.question('Overwrite '+ destfile +'? (y/N): ', function(r) {
-                    if (r.toLowerCase() === "y") {
-                        console.log("Notice: deleting " + destfile);
-                        fs.unlink(destfile, cb);
-                    }
-                    else {
-                        var e = new Error('Skipping export');
-                        e.name = "ProjectMill";
-                        cb(e);
-                    }
-                });
+                if (replaceExisting) {
+                    console.log("Notice: deleting " + destfile);
+                    fs.unlink(destfile, cb);
+                }
+                else {
+                    var e = new Error('Skipping export ' + i);
+                    e.name = "ProjectMill";
+                    cb(e);
+                }
             });
             render.push(function(cb, err) {
                 if (err) return cb(err);
@@ -440,7 +434,7 @@ if (command == "render" || command == "upload") {
                 // node command
                 args.push(process.execPath);
                 // tilemill index.js
-                args.push(path.join(tilemill));
+                args.push(tilemillPath);
                 // export command
                 args.push('export');
                 // datasource
@@ -455,13 +449,27 @@ if (command == "render" || command == "upload") {
                 if (data.height) args.push('--height=' + data.height);
                 if (data.minzoom) args.push('--minzoom=' + data.minzoom);
                 if (data.maxzoom) args.push('--maxzoom=' + data.maxzoom);
+                if (data.maxzoom) args.push('--files=' + fileDir);
 
-                console.log('Notice: '+ args.join(' '));
+                console.log('Notice: spawning nice ' + args.join(' '));
 
-                // todo get more output from the child process.
                 // todo get the actual name of the database written to.
-                spawn('nice', args).on('exit', function(code, signal) {
-                    var err = code ? new Error('Render failed: '+ i) : null;
+                var nice = spawn('nice', args);
+                nice.stdout.on('data', function(data) {
+                    console.log(data.toString());
+                });
+                nice.stderr.on('data',  function(data) {
+                    console.warn(data.toString());
+                });
+                nice.on('exit', function(code, signal) {
+                    var err = null;
+                    if (code) {
+                        err = new Error('Render failed: '+ i);
+                        err.name = 'ProjectMill';
+                    }
+                    else {
+                        console.log('Notice: rendered ' + destfile);
+                    }
                     cb(err);
                 });
             });
@@ -495,7 +503,6 @@ if (command == "render" || command == "upload") {
                     rows.push(function(nextRow, err, stmt) {
                         if (err) return nextRow(err);
 
-                        console.log('Notice: writing custom metadata: '+ k +' -> '+ data.MBmeta[k]);
                         stmt.run(k, data.MBmeta[k], function(err){
                             if (err) console.warn(err);
                             stmt.finalize(nextRow);
@@ -507,6 +514,10 @@ if (command == "render" || command == "upload") {
                     cb(err, db);
                 });
             });
+            render.push(function(cb, err) {
+                if (!err) console.log('Notice: added metadata to ' + destfile);
+                cb(err);
+            });
         });
         serial(render, function(err) {
             next(triageError(err));
@@ -514,13 +525,65 @@ if (command == "render" || command == "upload") {
     });
 }
 
-// Uploading... yea...
+// Upload available mbtiles files.
 if (command == "upload") {
+    var spawn = require('child_process').spawn;
     actions.push(function(next, err) {
         if (err) return next(err);
 
-        console.warn('Sorry, I cannot upload yet.')
-        next();
+        var upload = [];
+        Object.keys(config).forEach(function(i) {
+            var data = config[i];
+            if (data.syncAccount && data.syncAccessToken) {
+                upload.push(function(cb, err) {
+                    err = triageError(err);
+                    if (err) return next(err);
+
+                    // todo - mbtilesFile name is guess work.
+                    var args = [],
+                        mbtilesFile = path.join(fileDir, 'export', i + '.mbtiles');
+
+                    // tilemill index.js
+                    args.push(tilemillPath);
+                    // export command
+                    args.push('export');
+                    // datasource
+                    args.push(i);
+                    // file
+                    args.push(mbtilesFile);
+                    // signal upload
+                    args.push('--format=upload');
+                    // OAuth config.
+                    args.push('--syncAccount=' + data.syncAccount);
+                    args.push('--syncAccessToken=' + data.syncAccessToken);
+
+                    console.log('Notice: spawning ' + process.execPath + ' ' + args.join(' '));
+
+                    // todo get more output from the child process.
+                    var tilemill = spawn(process.execPath, args);
+                    tilemill.stdout.on('data', function(data) {
+                        console.log(data.toString());
+                    });
+                    tilemill.stderr.on('data', function(data) {
+                        console.warn(data.toString());
+                    });
+                    tilemill.on('exit', function(code, signal) {
+                        var err = null;
+                        if (code) {
+                            err = new Error('Upload failed: '+ i);
+                            err.name = 'ProjectMill';
+                        }
+                        else {
+                            console.log('Notice: uploaded ' + mbtilesFile + ' to ' + data.syncAccount);
+                        }
+                        cb(err);
+                    });
+                });
+            }
+        });
+        serial(upload, function(err) {
+            next(triageError(err));
+        });
     });
 }
 
@@ -528,8 +591,4 @@ if (command == "upload") {
 serial(actions, function(err) {
     if (err) console.warn(err.toString());
     console.log('Done.');
-
-    // Interface cleanup
-    cli.close();
-    process.stdin.destroy();
 });
