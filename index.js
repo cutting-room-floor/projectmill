@@ -421,7 +421,6 @@ if (command == "render") {
                 }
             });
             render.push(function(cb, err) {
-                err = triageError(err);
                 if (err) return cb(err);
 
                 if (data.format == undefined) {
