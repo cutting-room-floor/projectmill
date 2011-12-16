@@ -14,14 +14,14 @@ by running `npm install`.
 
 ## Configuration
 
-Configuration is expected as an json file which contains an array as the root
+Configuration is expected as a json file which contains an array as the root
 object. See `config.example.json` for an example. Each element in the array
 should be an object which can have the following keys:
 
 `source`        REQUIRED The source project, generally the name of folder it
                 lives in.
 
-`destintion`    REQUIRED The destintion project name.
+`destination`   REQUIRED The destination project name.
 
 `mml`           A json snippet which will be merged on top of the project's mml
                 file. To clear out an option set it to 'null'
@@ -51,17 +51,19 @@ Additionally, the following options will be passed to TileMill's export commnd
 
 ## Commands
 
-`mill`      Generate new tilemill projects based on the configuration.
+`mill`      Generates new tilemill projects based on configuration.
 
-`render`    Render projects (and mill them first if required).
+`render`    Renders projects that are present in configuration and have been milled.
 
-`upload`    NOT IMPLEMENTED Uploads projects to MapBox hosting (Mill and render first if required);
+`upload`    Uploads projects that are present in configuration and have been rendered.
 
 
 ## Options
 
 -t      Path to the TileMill install
 
--c      specify a config file. (Defaults: `./config.json`)
+-c      specify a configuration file. (Defaults: `./config.json`)
 
 -p      Path to TileMill project folder. (Defaults: `~/Documents/Mapbox`)
+
+-f      Replace existing projects (together with `mill`) or existing projects and exports (together with `render`).
