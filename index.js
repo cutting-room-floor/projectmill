@@ -2,20 +2,8 @@
 
 var fs = require('fs'),
     path = require('path'),
-    utils = require('./lib/utils');
-
-// Helper: Run an array of functions in serial
-function serial(steps, done) {
-    // From underscore.js
-    var wrap = function(func, wrapper) {
-        return function() {
-          var args = [func].concat(Array.prototype.slice.call(arguments));
-          return wrapper.apply(this, args);
-        };
-    };
-    // And run!
-    (steps.reduceRight(wrap, done))();
-}
+    utils = require('./lib/utils'),
+    serial = require('./lib/serial');
 
 // Helper: Determine if an error should just be logged.
 function triageError(err) {
