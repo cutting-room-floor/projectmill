@@ -58,6 +58,8 @@ individually or together.
 
 `--mill`      Generates new tilemill projects based on configuration.
 
+`--optimize`  Optimize SQLite queries by materializing results into a new sqlite database.
+
 `--render`    Renders projects that are present in configuration and have been milled.
 
 `--upload`    Uploads projects that are present in configuration and have been rendered.

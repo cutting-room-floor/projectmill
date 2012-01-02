@@ -89,8 +89,9 @@ var config = {},
     replaceExisting = argv.f || false;
 
 // If no command was issued bail.
-if (!argv.mill && !argv.render && !argv.upload) {
-    console.warn('Error: missing command. Available commands are `--mill`, `--render`, `--upload`');
+if (!argv.mill && !argv.optimize && !argv.render && !argv.upload) {
+    console.warn('Error: missing command. Available commands are `--mill`, '+
+        '`--optimize`, `--render`, `--upload`');
     console.warn(usage);
     process.exit(1);
 }
