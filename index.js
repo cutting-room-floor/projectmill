@@ -96,12 +96,22 @@ if (!argv.mill && !argv.render && !argv.upload) {
 }
 
 // Try to locate TileMill
-var tilemillPath = argv.t || 'tilemill';
+var tilemillPath = argv.t;
+if (!tilemillPath && require('os').type() == 'Darwin') {
+    tilemillPath = '/Applications/TileMill.app/Contents/Resources';
+}
+else if (!tilemillPath) {
+    tilemillPath = '/usr/share/tilemill';
+}
+
 try {
     tilemillPath = require.resolve(tilemillPath);
+    if (!argv.t) {
+        console.warn("Notice: using TileMill from '"+ tilemillPath +"'");
+    }
 }
 catch(err) {
-    console.warn('Error: could not locate TileMill');
+    console.warn("Error: could not locate TileMill. Looking in '"+ tilemillPath +"'");
     console.warn(usage);
     process.exit(1);
 }
