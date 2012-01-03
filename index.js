@@ -373,6 +373,25 @@ if (argv.optimize) {
             return vals;
         }
 
+        var resultInsert = function(db, table, row) {
+            var cols = colNames(row),
+                vals = rowVals(cols, row);
+
+            var params = [];
+            cols.forEach(function() {
+                params.push('?');
+            });
+            params = params.join(', ');
+
+            var sql = 'INSERT into '+ table;
+            sql += ' (\'' + cols.join("', '") +'\')';
+            sql += ' VALUES ('+ params  +')';
+
+            // We can just queue these queries, the sqlite3 bindings will
+            // force them to run serially.
+            db.run(sql, vals);
+        };
+
         var optimize = [];
         sources.forEach(function(s) {
             // Open the source database.
@@ -406,79 +425,66 @@ if (argv.optimize) {
                 s.dbTarget = new sqlite3.Database(target, function(err) {
                     if (err) return cb(err);
 
-                    s.dbTarget.serialize(cb);
+                    s.dbTarget.serialize();
+                    cb()
                 });
             });
 
-            // Execute the main query, and write to the target db.
+            // Copy geometry_columns & spatial_ref_sys tables
             optimize.push(function(cb, err) {
                 if (err) return cb(err);
-                var tablename = path.basename(s.datasource.file, '.sqlite');
-                var first = true;
-
-                var select = 'SELECT * FROM '+ s.datasource.table;
-                s.dbSource.each(select, function(err, row) {
-                    var insert = function() {
-                        var cols = colNames(row),
-                            vals = rowVals(cols, row);
-
-                        var params = [];
-                        cols.forEach(function() {
-                            params.push('?');
-                        });
-                        params = params.join(', ');
-
-                        var sql = 'INSERT into '+ tablename;
-                        sql += ' (\'' + cols.join("', '") +'\')';
-                        sql += ' VALUES ('+ params  +')';
-
-                        // We can just queue these queries, the sqlite3 bindings will
-                        // force them to run serially.
-                        s.dbTarget.run(sql, vals);
-                    };
-
-                    if (first) {
-                        // On the first result we need to create the table and
-                        // then insert.
-                        first = false;
-                        var sql = 'CREATE TABLE '+ tablename;
-                        sql += ' ('+ tableDef(row).join(", ") +')'
-
-                        s.dbTarget.exec(sql, function(err) {
-                            if (err) return next(err);
-                            insert();
-                        });
-                    }
-                    else {
-                        // For subsequent ones we just insert data;
-                        insert();
-                    }
-
-                }, cb);
-            });
-
-            // TODO copy geometry_columns & spatial_ref_sys tables
-            optimize.push(function(cb, err) {
-                if (err) return cb(err);
-                var sql = "SELECT sql FROM sqlite_master";
+                var sql = "SELECT tbl_name, sql FROM sqlite_master";
                 sql += " WHERE type='table'";
                 sql += " AND tbl_name IN ('geometry_columns', 'spatial_ref_sys')";
                 s.dbSource.all(sql, cb);
             });
 
-            optimize.push(function(cb, err, rows) {
+            optimize.push(function(cb, err, results) {
                 if (err) return cb(err);
 
-                rows.forEach(function(row) {
-                    s.dbTarget.exec(row.sql);
+                results.forEach(function(table) {
+                    // Create the table.
+                    s.dbTarget.exec(table.sql);
+
+                    // Insert data.
+                    var select = 'SELECT * FROM '+ table.tbl_name;
+                    s.dbSource.each(select, function(err, row) {
+                        resultInsert(s.dbTarget, table.tbl_name, row);
+                    });
                 });
                 cb();
+
             });
 
+            // Execute the main query, and write to the target db.
+            optimize.push(function(cb, err) {
+                if (err) return cb(err);
+
+                var tablename = path.basename(s.datasource.file, '.sqlite');
+                var first = true;
+
+                var select = 'SELECT * FROM '+ s.datasource.table;
+                s.dbSource.each(select, function(err, row) {
+
+                    // On the first result we need to create the table and
+                    // then insert.
+                    if (first) {
+                        first = false;
+                        var sql = 'CREATE TABLE '+ tablename;
+                        sql += ' ('+ tableDef(row).join(", ") +')'
+                        s.dbTarget.exec(sql);
+                    }
+
+                    resultInsert(s.dbTarget, tablename, row);
+
+                }, function() {
+                    console.warn('NOTICE: wrote '+ s.targetFile);
+                    cb();
+                });
+            });
         });
 
         serial(optimize, function(err) { next(err); });
-
     });
 }
 
