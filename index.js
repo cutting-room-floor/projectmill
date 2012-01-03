@@ -459,6 +459,24 @@ if (argv.optimize) {
                 s.targetTable = path.basename(s.datasource.file, '.sqlite');
 
                 var target = path.join(s.project[0], s.targetFile);
+
+                path.exists(target, function(exists) {
+                    if (!exists) return cb(null, target);
+
+                    if (replaceExisting) {
+                        console.log("Notice: deleting " + target);
+                        fs.unlink(target, function(err){
+                            cb(err, target);
+                        });
+                    }
+                });
+            });
+
+            // Create and open the target database.
+            optimize.push(function(cb, err, target) {
+                if (err) return next(err);
+
+                var target = path.join(s.project[0], s.targetFile);
                 s.dbTarget = new sqlite3.Database(target, function(err) {
                     if (err) return cb(err);
 
