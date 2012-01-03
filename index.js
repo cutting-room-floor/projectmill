@@ -335,7 +335,7 @@ if (argv.optimize) {
         serial(optimize, function(err) { next(err, sources); });
     });
 
-    // TODO create new dbs, insert data, update mml files...
+    // Create new dbs and insert data.
     actions.push(function(next, err, sources) {
         var sqlite3 = require('sqlite3');
 
@@ -389,6 +389,7 @@ if (argv.optimize) {
 
             // We can just queue these queries, the sqlite3 bindings will
             // force them to run serially.
+            // TODO it seems that insertion of blob data is failing.
             db.run(sql, vals);
         };
 
@@ -409,7 +410,7 @@ if (argv.optimize) {
             if (s.datasource.attachdb) {
                 optimize.push(function(cb, err) {
                     if (err) return next(err);
-                    //s.dbSource.run('ATTACH DATABASE foo as BAR');
+                    // TODO s.dbSource.run('ATTACH DATABASE foo as BAR');
                     console.log('ATTACH NOT IMPLEMENTED');
                     process.exit(1);
                 });
@@ -420,6 +421,7 @@ if (argv.optimize) {
                 if (err) return next(err);
 
                 s.targetFile = path.join('layers', 'materialized-' + path.basename(s.datasource.file));
+                s.targetTable = path.basename(s.datasource.file, '.sqlite');
 
                 var target = path.join(s.project[0], s.targetFile);
                 s.dbTarget = new sqlite3.Database(target, function(err) {
@@ -460,7 +462,6 @@ if (argv.optimize) {
             optimize.push(function(cb, err) {
                 if (err) return cb(err);
 
-                var tablename = path.basename(s.datasource.file, '.sqlite');
                 var first = true;
 
                 var select = 'SELECT * FROM '+ s.datasource.table;
@@ -470,21 +471,57 @@ if (argv.optimize) {
                     // then insert.
                     if (first) {
                         first = false;
-                        var sql = 'CREATE TABLE '+ tablename;
+                        var sql = 'CREATE TABLE '+ s.targetTable;
                         sql += ' ('+ tableDef(row).join(", ") +')'
                         s.dbTarget.exec(sql);
                     }
 
-                    resultInsert(s.dbTarget, tablename, row);
+                    resultInsert(s.dbTarget, s.targetTable, row);
 
                 }, function() {
+                    // Close the SQLite databases.
+                    delete s.dbTarget;
+                    delete s.dbSource;
+
+                    // Update the Datasource definition.
+                    s.datasource.file = s.targetFile;
+                    s.datasource.table = s.targetTable;
+
                     console.warn('NOTICE: wrote '+ s.targetFile);
                     cb();
                 });
             });
         });
 
-        serial(optimize, function(err) { next(err); });
+        serial(optimize, function(err) {
+            // TODO handle failure better.
+            next(err, sources);
+        });
+    });
+
+    // Update mml with new datasource information.
+    actions.push(function(next, err, sources) {
+        var optimize = [];
+        sources.forEach(function(s) {
+            var filename = path.join.apply(null, s.project);
+
+            optimize.push(function(cb, err) {
+                if (err) return cb(err);
+                fs.readFile(filename, 'utf8', cb);
+            });
+            // TODO write a copy?
+            optimize.push(function(cb, err, data) {
+                if (err) return cb(err);
+
+                var data = JSON.parse(data);
+                data.Layer[s.index].Datasource = s.datasource;
+
+                console.warn('NOTICE: updated '+ filename);
+                fs.writeFile(filename, JSON.stringify(data, null, 2), 'utf8', cb);
+            });
+        });
+
+        serial(optimize, function(err) { next(err) });
     });
 }
 
