@@ -277,6 +277,8 @@ if (argv.mill) {
 if (argv.optimize) {
     // Get locations of all MML files.
     actions.push(function(next, err) {
+        if (err) return next(err);
+
         var optimize = [],
             mml = {};
 
@@ -297,23 +299,35 @@ if (argv.optimize) {
             });
         });
 
-        serial(optimize, function(err) { next(err, mml) });
+        serial(optimize, function(err) {
+            if (err) return next(err);
+
+            var err = null;
+            if (Object.keys(mml).length == 0) {
+                err = new Error('Unable to optimize any projects.');
+                err.name = 'ProjectMill';
+            }
+            next(err, mml);
+        });
     });
 
     // Extract all source definitions which we can optimize.
     actions.push(function(next, err, mml) {
-        if (err) next(err);
+        if (err) return next(err);
 
         var optimize = [],
             sources = [];
+
         Object.keys(mml).forEach(function(f) {
             var filename = path.join.apply(null, mml[f]);
             optimize.push(function(cb, err) {
+                if (err) return cb(err);
+
                 fs.readFile(filename, 'utf8', cb);
             });
 
             optimize.push(function(cb, err, data) {
-                if (err) next(err);
+                if (err) return cb(err);
 
                 var data = JSON.parse(data);
 
@@ -332,11 +346,15 @@ if (argv.optimize) {
             });
         });
 
-        serial(optimize, function(err) { next(err, sources); });
+        serial(optimize, function(err) {
+            next(err, sources);
+        });
     });
 
     // Create new dbs and insert data.
     actions.push(function(next, err, sources) {
+        if (err) return next(err);
+
         var sqlite3 = require('sqlite3');
 
         var tableDef = function(row) {
@@ -411,12 +429,12 @@ if (argv.optimize) {
                 optimize.push(function(cb, err) {
                     if (err) return next(err);
                     // TODO s.dbSource.run('ATTACH DATABASE foo as BAR');
-                    console.log('ATTACH NOT IMPLEMENTED');
+                    console.warn('ATTACH NOT IMPLEMENTED');
                     process.exit(1);
                 });
             }
 
-            // Create and open the target database.
+            // Determine target and detect if it exists.
             optimize.push(function(cb, err) {
                 if (err) return next(err);
 
@@ -455,7 +473,6 @@ if (argv.optimize) {
                     });
                 });
                 cb();
-
             });
 
             // Execute the main query, and write to the target db.
@@ -501,6 +518,8 @@ if (argv.optimize) {
 
     // Update mml with new datasource information.
     actions.push(function(next, err, sources) {
+        if (err) return next(err);
+
         var optimize = [];
         sources.forEach(function(s) {
             var filename = path.join.apply(null, s.project);
@@ -509,7 +528,6 @@ if (argv.optimize) {
                 if (err) return cb(err);
                 fs.readFile(filename, 'utf8', cb);
             });
-            // TODO write a copy?
             optimize.push(function(cb, err, data) {
                 if (err) return cb(err);
 
