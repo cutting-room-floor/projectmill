@@ -432,13 +432,22 @@ if (argv.optimize) {
                 s.dbSource = new sqlite3.Database(s.datasource.file, sqlite3.OPEN_READONLY, cb);
             });
 
-
+            // Attach any databases to the source.
             if (s.datasource.attachdb) {
-                optimize.push(function(cb, err) {
-                    if (err) return next(err);
-                    // TODO s.dbSource.run('ATTACH DATABASE foo as BAR');
-                    console.warn('ATTACH NOT IMPLEMENTED');
-                    process.exit(1);
+                s.datasource.attachdb.split(',').forEach(function(v) {
+                    optimize.push(function(cb, err) {
+                        if (err) return cb(err);
+
+                        var info = v.split('@'),
+                            name = v[0],
+                            filepath = v[1];
+
+                        // Use absolute paths.
+                        if (filepath.indexOf('/') !== 0) {
+                            filepath = path.join(s.project[0], filepath);
+                        }
+                        s.dbSource.run('ATTACH DATABASE ? as ?', filepath, name, cb);
+                    });
                 });
             }
 
