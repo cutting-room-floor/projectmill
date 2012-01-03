@@ -370,7 +370,10 @@ if (argv.optimize) {
             Object.keys(row).forEach(function(k) {
                 var type = typeof row[k];
 
-                if (type == 'number') {
+                if (type == 'number' && k == 'OGC_FID') {
+                    cols.push("'"+k+"' INTEGER PRIMARY KEY");
+                }
+                else if (type == 'number') {
                     cols.push("'"+k+"' FLOAT");
                 }
                 else if (type == 'string') {
