@@ -549,7 +549,6 @@ if (argv.optimize) {
         });
 
         serial(optimize, function(err) {
-            // TODO handle failure better.
             next(err, sources);
         });
     });
