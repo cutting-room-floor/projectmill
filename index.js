@@ -403,11 +403,16 @@ if (argv.optimize) {
                 s.targetFile = path.join('layers', 'materialized-' + path.basename(s.datasource.file));
 
                 var target = path.join(s.project[0], s.targetFile);
-                s.dbTarget = new sqlite3.Database(target, cb);
+                s.dbTarget = new sqlite3.Database(target, function(err) {
+                    if (err) return cb(err);
+
+                    s.dbTarget.serialize(cb);
+                });
             });
 
+            // Execute the main query, and write to the target db.
             optimize.push(function(cb, err) {
-                if (err) return next(err);
+                if (err) return cb(err);
                 var tablename = path.basename(s.datasource.file, '.sqlite');
                 var first = true;
 
@@ -427,6 +432,8 @@ if (argv.optimize) {
                         sql += ' (\'' + cols.join("', '") +'\')';
                         sql += ' VALUES ('+ params  +')';
 
+                        // We can just queue these queries, the sqlite3 bindings will
+                        // force them to run serially.
                         s.dbTarget.run(sql, vals);
                     };
 
@@ -451,6 +458,22 @@ if (argv.optimize) {
             });
 
             // TODO copy geometry_columns & spatial_ref_sys tables
+            optimize.push(function(cb, err) {
+                if (err) return cb(err);
+                var sql = "SELECT sql FROM sqlite_master";
+                sql += " WHERE type='table'";
+                sql += " AND tbl_name IN ('geometry_columns', 'spatial_ref_sys')";
+                s.dbSource.all(sql, cb);
+            });
+
+            optimize.push(function(cb, err, rows) {
+                if (err) return cb(err);
+
+                rows.forEach(function(row) {
+                    s.dbTarget.exec(row.sql);
+                });
+                cb();
+            });
 
         });
 

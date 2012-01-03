@@ -58,7 +58,11 @@ individually or together.
 
 `--mill`      Generates new tilemill projects based on configuration.
 
-`--optimize`  Optimize SQLite queries by materializing results into a new sqlite database.
+`--optimize`  Optimize SQLite queries by materializing results into a new
+              sqlite database. NOTE: as javascript only has one number type
+              and we're using javascript for transport really big or small
+              numbers may be truncated. ALSO, this will not work on Spatialite
+              databases.
 
 `--render`    Renders projects that are present in configuration and have been milled.
 
