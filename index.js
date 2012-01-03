@@ -284,6 +284,8 @@ if (argv.optimize) {
 
         Object.keys(config).forEach(function(i) {
             optimize.push(function(cb, err) {
+                if (err) return cb(err);
+
                 utils.readdirr(config[i].destination, cb);
             });
 
@@ -304,7 +306,7 @@ if (argv.optimize) {
 
             var err = null;
             if (Object.keys(mml).length == 0) {
-                err = new Error('Unable to optimize any projects.');
+                err = new Error('Could not open any .mml files.');
                 err.name = 'ProjectMill';
             }
             next(err, mml);
@@ -347,6 +349,12 @@ if (argv.optimize) {
         });
 
         serial(optimize, function(err) {
+            if (err) return next(err);
+
+            if (sources.length == 0) {
+                err = new Error('Unable to optimize any projects.');
+                err.name = 'ProjectMill';
+            }
             next(err, sources);
         });
     });
@@ -504,7 +512,7 @@ if (argv.optimize) {
                     s.datasource.file = s.targetFile;
                     s.datasource.table = s.targetTable;
 
-                    console.warn('NOTICE: wrote '+ s.targetFile);
+                    console.warn('Notice: wrote '+ s.targetFile);
                     cb();
                 });
             });
@@ -534,12 +542,15 @@ if (argv.optimize) {
                 var data = JSON.parse(data);
                 data.Layer[s.index].Datasource = s.datasource;
 
-                console.warn('NOTICE: updated '+ filename);
+                console.warn('Notice: updated '+ filename);
                 fs.writeFile(filename, JSON.stringify(data, null, 2), 'utf8', cb);
             });
         });
 
-        serial(optimize, function(err) { next(err) });
+        serial(optimize, function(err) {
+            err = triageError(err);
+            next(err);
+        });
     });
 }
 
