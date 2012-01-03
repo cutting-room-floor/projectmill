@@ -273,6 +273,192 @@ if (argv.mill) {
     });
 }
 
+// Optimize SQLite datasources
+if (argv.optimize) {
+    // Get locations of all MML files.
+    actions.push(function(next, err) {
+        var optimize = [],
+            mml = {};
+
+        Object.keys(config).forEach(function(i) {
+            optimize.push(function(cb, err) {
+                utils.readdirr(config[i].destination, cb);
+            });
+
+            optimize.push(function(cb, err, files) {
+                if (err) return cb(err);
+
+                files.forEach(function(filename) {
+                    if (path.extname(filename) == '.mml') {
+                        mml[i] = [config[i].destination, filename];
+                    }
+                });
+                cb();
+            });
+        });
+
+        serial(optimize, function(err) { next(err, mml) });
+    });
+
+    // Extract all source definitions which we can optimize.
+    actions.push(function(next, err, mml) {
+        if (err) next(err);
+
+        var optimize = [],
+            sources = [];
+        Object.keys(mml).forEach(function(f) {
+            var filename = path.join.apply(null, mml[f]);
+            optimize.push(function(cb, err) {
+                fs.readFile(filename, 'utf8', cb);
+            });
+
+            optimize.push(function(cb, err, data) {
+                if (err) next(err);
+
+                var data = JSON.parse(data);
+
+                data.Layer.forEach(function(layer, i) {
+                    if (layer.Datasource.type == 'sqlite' &&
+                        layer.Datasource.table.indexOf(' ') !== -1)
+                    { 
+                        sources.push({
+                            project: mml[f],
+                            index: i,
+                            datasource: layer.Datasource
+                        });
+                    }
+                });
+                cb();
+            });
+        });
+
+        serial(optimize, function(err) { next(err, sources); });
+    });
+
+    // TODO create new dbs, insert data, update mml files...
+    actions.push(function(next, err, sources) {
+        var sqlite3 = require('sqlite3');
+
+        var tableDef = function(row) {
+            var cols = [];
+            Object.keys(row).forEach(function(k) {
+                var type = typeof row[k];
+
+                if (type == 'number') {
+                    cols.push("'"+k+"' FLOAT");
+                }
+                else if (type == 'string') {
+                    cols.push("'"+k+"' VARCHAR");
+                }
+                else {
+                    cols.push("'"+k+"' BLOB");
+                }
+            });
+            return cols;
+        };
+
+        var colNames = function(row) {
+            var cols = []
+            Object.keys(row).forEach(function(k) {
+                cols.push(k);
+            });
+            return cols;
+        };
+
+        var rowVals = function(cols, row) {
+            var vals = [];
+            cols.forEach(function(k) {
+                vals.push(row[k]);
+            });
+            return vals;
+        }
+
+        var optimize = [];
+        sources.forEach(function(s) {
+            // Open the source database.
+            optimize.push(function(cb, err) {
+                if (err) return next(err);
+
+                // Make all paths absolute.
+                if (s.datasource.file[0] !== '/') {
+                    s.datasource.file = path.normalize(path.join(s.project[0], s.datasource.file));
+                }
+                s.dbSource = new sqlite3.Database(s.datasource.file, sqlite3.OPEN_READONLY, cb);
+            });
+
+
+            if (s.datasource.attachdb) {
+                optimize.push(function(cb, err) {
+                    if (err) return next(err);
+                    //s.dbSource.run('ATTACH DATABASE foo as BAR');
+                    console.log('ATTACH NOT IMPLEMENTED');
+                    process.exit(1);
+                });
+            }
+
+            // Create and open the target database.
+            optimize.push(function(cb, err) {
+                if (err) return next(err);
+
+                s.targetFile = path.join('layers', 'materialized-' + path.basename(s.datasource.file));
+
+                var target = path.join(s.project[0], s.targetFile);
+                s.dbTarget = new sqlite3.Database(target, cb);
+            });
+
+            optimize.push(function(cb, err) {
+                if (err) return next(err);
+                var tablename = path.basename(s.datasource.file, '.sqlite');
+                var first = true;
+
+                var select = 'SELECT * FROM '+ s.datasource.table;
+                s.dbSource.each(select, function(err, row) {
+                    var insert = function() {
+                        var cols = colNames(row),
+                            vals = rowVals(cols, row);
+
+                        var params = [];
+                        cols.forEach(function() {
+                            params.push('?');
+                        });
+                        params = params.join(', ');
+
+                        var sql = 'INSERT into '+ tablename;
+                        sql += ' (\'' + cols.join("', '") +'\')';
+                        sql += ' VALUES ('+ params  +')';
+
+                        s.dbTarget.run(sql, vals);
+                    };
+
+                    if (first) {
+                        // On the first result we need to create the table and
+                        // then insert.
+                        first = false;
+                        var sql = 'CREATE TABLE '+ tablename;
+                        sql += ' ('+ tableDef(row).join(", ") +')'
+
+                        s.dbTarget.exec(sql, function(err) {
+                            if (err) return next(err);
+                            insert();
+                        });
+                    }
+                    else {
+                        // For subsequent ones we just insert data;
+                        insert();
+                    }
+
+                }, cb);
+            });
+
+            // TODO copy geometry_columns & spatial_ref_sys tables
+
+        });
+
+        serial(optimize, function(err) { next(err); });
+
+    });
+}
+
 // Render all available projects.
 if (argv.render) {
     var spawn = require('child_process').spawn,
