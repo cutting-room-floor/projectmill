@@ -124,7 +124,10 @@ actions.push(function(next, err) {
     if (err) return next(err);
 
     var configFile = argv.c || 'config.json';
-    fs.readFile(path.join(process.cwd(), configFile), 'utf8', next);
+    if (configFile.indexOf('/') !== 0) {
+        configFile = path.join(process.cwd(), configFile);
+    }
+    fs.readFile(configFile, 'utf8', next);
 });
 actions.push(function(next, err, data) {
     if (err) return next(err);
