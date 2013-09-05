@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
-var fs = require('fs'),
-    path = require('path'),
-    utils = require('./lib/utils'),
-    serial = require('./lib/serial');
+var fs = require('fs');
+var path = require('path');
+var utils = require('./lib/utils');
+var serial = require('./lib/serial');
+var exists = require('fs').exists || require('path').exists;
 
 // Helper: Determine if an error should just be logged.
 function triageError(err) {
@@ -190,10 +191,10 @@ if (argv.mill) {
                 err = triageError(err);
                 if (err) return cb(err);
 
-                path.exists(config[i].destination, cb);
+                exists(config[i].destination, cb);
             });
-            mill.push(function(cb, exists) {
-                if (!exists) return cb();
+            mill.push(function(cb, found) {
+                if (!found) return cb();
 
                 if (replaceExisting) {
                     console.log('Notice: removing project '+ config[i].destination);
@@ -235,10 +236,10 @@ if (argv.mill) {
                     }
 
                     setup.push(function(next) {
-                        path.exists(destdir, next);
+                        exists(destdir, next);
                     });
-                    setup.push(function(next, err, exists) {
-                        if (exists) return next();
+                    setup.push(function(next, err, found) {
+                        if (found) return next();
 
                         utils.mkdirp(destdir, '0777', next);
                     });
@@ -292,10 +293,10 @@ if (argv.render) {
                 err = triageError(err);
                 if (err) return cb(err);
 
-                path.exists(destfile, cb);
+                exists(destfile, cb);
             });
-            render.push(function(cb, exists) {
-                if (!exists) return cb();
+            render.push(function(cb, found) {
+                if (!found) return cb();
 
                 if (replaceExisting) {
                     console.log("Notice: deleting " + destfile);
