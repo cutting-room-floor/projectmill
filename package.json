@@ -1,7 +1,7 @@
 {
   "author": "Jeff Miccolis <jeff@miccolis.net> (github.com/miccolis)",
   "name": "ProjectMill",
-  "description": "Druplicate, render and upload TileMill projects via the command line.",
+  "description": "Duplicate, render and upload TileMill projects via the command line.",
   "version": "0.0.0",
   "repository": {
     "url": ""
