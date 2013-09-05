@@ -4,15 +4,39 @@ ProjectMill
 Need to generate a bunch of TileMill projects that are nearly identical and
 then render them all out? What to script that? We gotcha covered.
 
+## Depends
+
+ - Node.js v0.8.x or v0.10.x
+
+## Installation
+
+ProjectMill is a node.js script that is run from the command line. To install:
+
+    git clone https://github.com/mapbox/projectmill.git
+    cd projectmill
+    npm install
+
+## Usage
+
 Usage: `./index.js <command> [options]`
 
 Example: `./index.js --mill --render -c config.example.json -t ../tilemill/`
 
-## Installation
+Note: the `-t` option can either point to a source checkout and built version of TileMill
+or it can point to a packaged version of TileMill. 
 
-ProjectMill is a node.js script. It expects to be run with node 0.4.x, just
-like TileMill. ProjectMill has two dependencies that can be installed with npm,
-by running `npm install`.
+On Ubuntu it can point to the apt-get installed location of TileMill:
+
+    -t /usr/share/tilemill/
+
+On OS X the `TileMill.app` bundles its own node.js version so you first need to set your PATH
+
+    export PATH=/Applications/TileMill.app/Contents/Resources/:$PATH
+
+Then you can pass the `-t` argument to point inside the TileMill.app:
+
+    -t /Applications/TileMill.app/Contents/Resources/
+
 
 ## Configuration
 

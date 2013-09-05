@@ -1,18 +1,16 @@
 {
   "author": "Jeff Miccolis <jeff@miccolis.net> (github.com/miccolis)",
   "name": "ProjectMill",
-  "description": "Druplicate, render and upload TileMill projects via the command line.",
-  "version": "0.0.0",
+  "description": "Duplicate, render and upload TileMill projects via the command line.",
+  "version": "0.0.1",
   "repository": {
-    "url": ""
+    "url": "https://github.com/mapbox/projectmill"
   },
   "main": "index.js",
-  "engines": {
-    "node": "~0.4.12"
-  },
+  "engineStrict": true,
+  "engines": { "node": "0.6.x || 0.8.x || 0.10.x" },
   "dependencies": {
     "optimist": "0.1.x",
-    "sqlite3": "~2.0.16"
-  },
-  "devDependencies": {}
+    "sqlite3": "~2.1.15"
+  }
 }
